@@ -4,13 +4,25 @@ A tiny SwiftBar menu-bar manager for what your MacBook does when you close the l
 
 Most keep-awake tools (Amphetamine, caffeinate) leave it to you to remember state. lid-governor is a governor: it has defaults, one-click exceptions, and every exception dies on its own.
 
+# lid-governor
+
+Keep your MacBook running with the lid closed, and never worry that you left it on.
+
+By default, closing the lid sleeps your Mac, exactly like normal. When you actually want it to keep working with the lid shut, you turn that on with one click in the menu bar.
+
+The whole point is what happens after: it turns itself back off. Unplug it, open the lid, drop under 20% battery, or let it start overheating on battery, and it goes back to sleeping normally on its own. You never have to remember you left it awake.
+
+Most keep-awake apps just flip a switch and leave the rest to you. That is how a laptop ends up hot and draining in a bag. This one puts it back the way it found it.
+
 ## What it does
 
-| State | Icon | Behavior |
-|---|---|---|
-| Default | moon.zzz | Closing the lid sleeps the Mac, as macOS intends |
-| Night mode (AC) | moon.fill | On power, the Mac keeps working with the lid closed. Auto-enables when you plug in; one click to decline for the session |
-| Battery override | moon.circle.fill | Temporary keep-awake on battery, and it enables macOS Low Power Mode so the closed laptop runs as cool as possible |
+- **Closed lid, on power:** keeps running. Turns on by itself when you plug in.
+- **Closed lid, on battery:** stays asleep by default. One click keeps it awake for a while, and also switches on Low Power Mode so a closed laptop stays cool.
+- **Any override ends on its own:** open the lid, unplug, go under 20%, or start overheating, and it reverts.
+- **Won't arm under 25% battery.** Won't cook itself: if the Mac throttles from heat on battery, it sleeps and writes the event to a CSV you can read.
+
+Menu and alerts are in your Mac's language (English or Russian). You can mute the alerts from the menu. Native menu-bar icons, about 200 lines of bash, MIT.
+
 
 Every exception lives exactly one lid cycle. The battery override reverts itself when you open the lid, when battery drops below 20%, or when power state changes — and Low Power Mode is restored on every exit path. Refuses to arm below 25%. All markers die on reboot.
 
