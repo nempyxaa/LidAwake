@@ -2,15 +2,15 @@
 # Menu-bar toggle v4 (07.08.2026): AC toggles night mode; on BATTERY arms a temporary keep-awake
 # override that now ALSO enables Low Power Mode (min heat, Piotr 06-07.08). Self-reverts as before.
 # Strings localized from OS language (ru/en, fallback en).
-NOTIFY_OFF="$HOME/.lid-governor/state/notify-off"
+NOTIFY_OFF="$HOME/.lid-awake/state/notify-off"
 notify(){ [ -f "$NOTIFY_OFF" ] && return 0; osascript -e "display notification \"$1\" with title \"$2\"" 2>/dev/null; }
 FLAG=$(pmset -g | awk '/SleepDisabled/ {print $2}')
-CONFIG="$HOME/.lid-governor/state/config"
+CONFIG="$HOME/.lid-awake/state/config"
 [ -f "$CONFIG" ] && . "$CONFIG"
 THERMAL_GUARD=${THERMAL_GUARD:-1}
 BATTERY_FLOOR=${BATTERY_FLOOR:-20}
-MARK="$HOME/.lid-governor/state/lid-manual-off"
-BATOK="$HOME/.lid-governor/state/lid-battery-override"
+MARK="$HOME/.lid-awake/state/lid-manual-off"
+BATOK="$HOME/.lid-awake/state/lid-battery-override"
 
 L=$(defaults read -g AppleLocale 2>/dev/null | cut -c1-2)
 if [ "$L" = "ru" ]; then

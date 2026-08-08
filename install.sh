@@ -1,8 +1,8 @@
 #!/bin/bash
-# lid-governor installer. Requires SwiftBar (https://swiftbar.app).
+# lid-awake installer. Requires SwiftBar (https://swiftbar.app).
 set -e
 DIR="$(cd "$(dirname "$0")" && pwd)"
-DEST="$HOME/.lid-governor"
+DEST="$HOME/.lid-awake"
 
 PLUGDIR=$(defaults read com.ameba.SwiftBar PluginDirectory 2>/dev/null || true)
 if [ -z "$PLUGDIR" ]; then
@@ -32,7 +32,7 @@ launchctl load "$PLIST"
 
 echo ""
 echo "Installed. One manual step remains: passwordless pmset for the toggle."
-echo "Run:  sudo visudo -f /etc/sudoers.d/lid-governor"
+echo "Run:  sudo visudo -f /etc/sudoers.d/lid-awake"
 echo "and add the single line:"
 echo ""
 echo "  $USER ALL=(root) NOPASSWD: /usr/bin/pmset"

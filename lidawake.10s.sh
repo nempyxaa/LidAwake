@@ -4,15 +4,15 @@
 # override (min heat), strings localized from OS language (ru/en, fallback en).
 FLAG=$(pmset -g | awk '/SleepDisabled/ {print $2}')
 BATOK=0
-[ -f "$HOME/.lid-governor/state/lid-battery-override" ] && BATOK=1
+[ -f "$HOME/.lid-awake/state/lid-battery-override" ] && BATOK=1
 if pmset -g ps | head -1 | grep -q "AC Power"; then AC=1; else AC=0; fi
 PCT=$(pmset -g batt | grep -o "[0-9]*%" | tr -d '%' | head -1)
 LPM=$(pmset -g | awk '/lowpowermode/ {print $2}')
-CONFIG="$HOME/.lid-governor/state/config"
+CONFIG="$HOME/.lid-awake/state/config"
 [ -f "$CONFIG" ] && . "$CONFIG"
 THERMAL_GUARD=${THERMAL_GUARD:-1}
 BATTERY_FLOOR=${BATTERY_FLOOR:-20}
-NOTIFY_OFF="$HOME/.lid-governor/state/notify-off"
+NOTIFY_OFF="$HOME/.lid-awake/state/notify-off"
 
 L=$(defaults read -g AppleLocale 2>/dev/null | cut -c1-2)
 if [ "$L" = "ru" ]; then
@@ -81,25 +81,25 @@ else
 fi
 echo "---"
 if [ "$FLAG" = "1" ]; then
-  echo "$T_DEFAULT | sfimage=moon.zzz bash=$HOME/.lid-governor/lid-toggle.sh terminal=false refresh=true"
-  echo "$T_SLEEPNOW_DEF | sfimage=powersleep bash=/bin/bash param1=-c param2='rm -f $HOME/.lid-governor/state/lid-battery-override; sudo -n pmset -b lowpowermode 0; sudo -n pmset -a disablesleep 0; sudo -n pmset sleepnow' terminal=false refresh=true"
+  echo "$T_DEFAULT | sfimage=moon.zzz bash=$HOME/.lid-awake/lid-toggle.sh terminal=false refresh=true"
+  echo "$T_SLEEPNOW_DEF | sfimage=powersleep bash=/bin/bash param1=-c param2='rm -f $HOME/.lid-awake/state/lid-battery-override; sudo -n pmset -b lowpowermode 0; sudo -n pmset -a disablesleep 0; sudo -n pmset sleepnow' terminal=false refresh=true"
 else
   if [ "$AC" = "1" ]; then
-    echo "$T_NIGHT_AC | sfimage=moon.fill bash=$HOME/.lid-governor/lid-toggle.sh terminal=false refresh=true"
+    echo "$T_NIGHT_AC | sfimage=moon.fill bash=$HOME/.lid-awake/lid-toggle.sh terminal=false refresh=true"
   else
-    echo "$T_BAT_OVR | sfimage=moon.circle.fill bash=$HOME/.lid-governor/lid-toggle.sh terminal=false refresh=true"
+    echo "$T_BAT_OVR | sfimage=moon.circle.fill bash=$HOME/.lid-awake/lid-toggle.sh terminal=false refresh=true"
   fi
   echo "$T_SLEEPNOW | sfimage=powersleep bash=/bin/bash param1=-c param2='sudo -n pmset sleepnow' terminal=false"
 fi
 echo "---"
 if [ -f "$NOTIFY_OFF" ]; then
-  echo "$T_NOTIF_OFF | sfimage=bell.slash.fill bash=/bin/bash param1=-c param2='rm -f \"$HOME/.lid-governor/state/notify-off\"' terminal=false refresh=true"
+  echo "$T_NOTIF_OFF | sfimage=bell.slash.fill bash=/bin/bash param1=-c param2='rm -f \"$HOME/.lid-awake/state/notify-off\"' terminal=false refresh=true"
 else
-  echo "$T_NOTIF_ON | sfimage=bell.fill bash=/bin/bash param1=-c param2='mkdir -p \"$HOME/.lid-governor/state\"; touch \"$HOME/.lid-governor/state/notify-off\"' terminal=false refresh=true"
+  echo "$T_NOTIF_ON | sfimage=bell.fill bash=/bin/bash param1=-c param2='mkdir -p \"$HOME/.lid-awake/state\"; touch \"$HOME/.lid-awake/state/notify-off\"' terminal=false refresh=true"
 fi
 if [ "$THERMAL_GUARD" = "1" ]; then
-  echo "$T_THERM_ON | sfimage=thermometer.medium bash=$HOME/.lid-governor/lid-settings.sh param1=$CONFIG param2=THERMAL_GUARD param3=toggle terminal=false refresh=true"
+  echo "$T_THERM_ON | sfimage=thermometer.medium bash=$HOME/.lid-awake/lid-settings.sh param1=$CONFIG param2=THERMAL_GUARD param3=toggle terminal=false refresh=true"
 else
-  echo "$T_THERM_OFF | sfimage=thermometer.low bash=$HOME/.lid-governor/lid-settings.sh param1=$CONFIG param2=THERMAL_GUARD param3=toggle terminal=false refresh=true"
+  echo "$T_THERM_OFF | sfimage=thermometer.low bash=$HOME/.lid-awake/lid-settings.sh param1=$CONFIG param2=THERMAL_GUARD param3=toggle terminal=false refresh=true"
 fi
-echo "$T_BFLOOR: ${BATTERY_FLOOR}% | sfimage=battery.25 bash=$HOME/.lid-governor/lid-settings.sh param1=$CONFIG param2=BATTERY_FLOOR param3=cycle terminal=false refresh=true"
+echo "$T_BFLOOR: ${BATTERY_FLOOR}% | sfimage=battery.25 bash=$HOME/.lid-awake/lid-settings.sh param1=$CONFIG param2=BATTERY_FLOOR param3=cycle terminal=false refresh=true"

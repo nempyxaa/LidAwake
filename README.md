@@ -1,4 +1,4 @@
-# lid-governor
+# lid-awake
 
 Keep your MacBook running with the lid closed, and never worry that you left it on.
 
@@ -30,7 +30,7 @@ While it keeps a closed laptop awake on battery, the guard watches whether macOS
 
 > Went to sleep due to overheating at 2:35pm on Saturday, 15 Aug
 
-The note shows up in Notification Center, so you see exactly what happened and when. There's also a one-line text history at `~/.lid-governor/thermal-history.txt` if you want to look back.
+The note shows up in Notification Center, so you see exactly what happened and when. There's also a one-line text history at `~/.lid-awake/thermal-history.txt` if you want to look back.
 
 ## Adjustable, on by default
 
@@ -47,7 +47,7 @@ Both safety limits are on out of the box and adjustable from the menu:
 
 1. Install [SwiftBar](https://swiftbar.app) and pick a plugin folder.
 2. `./install.sh`
-3. One manual step (the installer prints it): allow passwordless `pmset` via `sudo visudo -f /etc/sudoers.d/lid-governor` with the line
+3. One manual step (the installer prints it): allow passwordless `pmset` via `sudo visudo -f /etc/sudoers.d/lid-awake` with the line
    `yourusername ALL=(root) NOPASSWD: /usr/bin/pmset`
 
 That sudoers line is the only privilege the tool needs: `pmset` toggles `disablesleep` and `lowpowermode`. All scripts are ~200 lines of plain bash — read them.
@@ -56,9 +56,9 @@ That sudoers line is the only privilege the tool needs: `pmset` toggles `disable
 
 ```
 launchctl unload ~/Library/LaunchAgents/org.lidgovernor.guard.plist
-rm -rf ~/.lid-governor ~/Library/LaunchAgents/org.lidgovernor.guard.plist
+rm -rf ~/.lid-awake ~/Library/LaunchAgents/org.lidgovernor.guard.plist
 rm <your SwiftBar plugin folder>/lid.10s.sh
-sudo rm /etc/sudoers.d/lid-governor
+sudo rm /etc/sudoers.d/lid-awake
 sudo pmset -a disablesleep 0
 ```
 
