@@ -13,7 +13,7 @@ Most keep-awake apps just flip a switch and leave the rest to you. That is how a
 - **Closed lid, on power:** keeps running. Turns on by itself when you plug in.
 - **Closed lid, on battery:** stays asleep by default. One click keeps it awake for a while, and also switches on Low Power Mode so a closed laptop stays cool.
 - **Any override ends on its own:** open the lid, unplug, go under 20%, or start overheating, and it reverts.
-- **Won't arm under 25% battery.** Won't cook itself: if the Mac throttles from heat on battery, it sleeps and writes the event to a CSV you can read.
+- **Won't arm under 25% battery.** Won't cook itself: if the Mac throttles from heat on battery, it sleeps and leaves you a plain dated note.
 
 Menu and alerts are in your Mac's language (English or Russian). You can mute the alerts from the menu. Native menu-bar icons, about 200 lines of bash, MIT.
 
