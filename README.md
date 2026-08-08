@@ -16,6 +16,19 @@ Every exception lives exactly one lid cycle. The battery override reverts itself
 
 Menu and notifications are localized from the OS language (English, Russian; English fallback). Notifications can be muted from the menu (🔔/🔕) - the state machine keeps working silently.
 
+
+
+## Thermal safety + learning log
+
+While it keeps a closed laptop awake on battery, the guard reads `pmset -g therm` every 60s. macOS drops `CPU_Speed_Limit` below 100 the moment it throttles for heat or power. If that happens, the guard forces the Mac to sleep so it cools — you cannot cook a machine in a bag.
+
+Every tick is recorded to `~/.lid-governor/state/thermal-events.csv` (`iso_time,battery_pct,cpu_speed_limit,action`) while an override is active, with a `forced-sleep` row whenever it acts. It is a plain CSV you can open, chart, or share — a record of how your own Mac behaves thermally with the lid shut.
+
+## Battery floors
+
+- **Refuses to arm below 25%.**
+- **Revokes an active override below 20%** and lets the Mac sleep.
+
 ## Install
 
 1. Install [SwiftBar](https://swiftbar.app) and pick a plugin folder.
