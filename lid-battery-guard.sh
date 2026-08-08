@@ -1,17 +1,17 @@
 #!/bin/bash
-# Lid governor v3 (Piotr 03.08 18:19): AC -> night mode auto-ON (unless manually declined this session).
+# lid-awake v3 (Piotr 03.08 18:19): AC -> night mode auto-ON (unless manually declined this session).
 # BATTERY -> default SLEEP on lid close, but the menu-bar toggle may arm a TEMPORARY battery override
 # (marker file). The override self-reverts: lid reopen, battery <20%, or power state change.
 
 L=$(defaults read -g AppleLocale 2>/dev/null | cut -c1-2)
 if [ "$L" = "ru" ]; then
-  G_OPEN_T="💤 Lid governor"; G_OPEN_B="Крышка открыта: батарейный оверрайд снят, дефолт снова сон."
-  G_AC_T="🌙 Lid governor"; G_AC_B="На питании: ночной режим включён автоматически. Выключить - клик по луне."
-  G_LOW_T="⚠️ Lid governor"; G_LOW_B="Батарея <20%: оверрайд снят принудительно, Mac уснёт с крышкой."; G_HOT_T="lid-awake"; G_HOT_PREFIX="Ушёл в сон из-за перегрева в"; G_BAT_T="💤 Lid governor"; G_BAT_B="На батарее: ночной режим выключен, крышка усыпляет как обычно."
+  G_OPEN_T="💤 lid-awake"; G_OPEN_B="Крышка открыта: батарейный оверрайд снят, дефолт снова сон."
+  G_AC_T="🌙 lid-awake"; G_AC_B="На питании: ночной режим включён автоматически. Выключить - клик по луне."
+  G_LOW_T="⚠️ lid-awake"; G_LOW_B="Батарея <20%: оверрайд снят принудительно, Mac уснёт с крышкой."; G_HOT_T="lid-awake"; G_HOT_PREFIX="Ушёл в сон из-за перегрева в"; G_BAT_T="💤 lid-awake"; G_BAT_B="На батарее: ночной режим выключен, крышка усыпляет как обычно."
 else
-  G_OPEN_T="💤 Lid governor"; G_OPEN_B="Lid opened: battery override cleared, default sleep restored."
-  G_AC_T="🌙 Lid governor"; G_AC_B="On AC: night mode enabled automatically. Click the moon to disable."
-  G_LOW_T="⚠️ Lid governor"; G_LOW_B="Battery below 20%: override revoked, Mac will sleep with the lid closed."; G_HOT_T="lid-awake"; G_HOT_PREFIX="Went to sleep due to overheating at"; G_BAT_T="💤 Lid governor"; G_BAT_B="On battery: night mode off, the lid sleeps the Mac as usual."
+  G_OPEN_T="💤 lid-awake"; G_OPEN_B="Lid opened: battery override cleared, default sleep restored."
+  G_AC_T="🌙 lid-awake"; G_AC_B="On AC: night mode enabled automatically. Click the moon to disable."
+  G_LOW_T="⚠️ lid-awake"; G_LOW_B="Battery below 20%: override revoked, Mac will sleep with the lid closed."; G_HOT_T="lid-awake"; G_HOT_PREFIX="Went to sleep due to overheating at"; G_BAT_T="💤 lid-awake"; G_BAT_B="On battery: night mode off, the lid sleeps the Mac as usual."
 fi
 NOTIFY_OFF="$HOME/.lid-awake/state/notify-off"
 notify(){ [ -f "$NOTIFY_OFF" ] && return 0; osascript -e "display notification \"$1\" with title \"$2\"" 2>/dev/null; }

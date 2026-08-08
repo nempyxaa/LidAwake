@@ -55,9 +55,9 @@ That sudoers line is the only privilege the tool needs: `pmset` toggles `disable
 ## Uninstall
 
 ```
-launchctl unload ~/Library/LaunchAgents/org.lidgovernor.guard.plist
-rm -rf ~/.lid-awake ~/Library/LaunchAgents/org.lidgovernor.guard.plist
-rm <your SwiftBar plugin folder>/lid.10s.sh
+launchctl unload ~/Library/LaunchAgents/org.lidawake.guard.plist
+rm -rf ~/.lid-awake ~/Library/LaunchAgents/org.lidawake.guard.plist
+rm <your SwiftBar plugin folder>/lidawake.10s.sh
 sudo rm /etc/sudoers.d/lid-awake
 sudo pmset -a disablesleep 0
 ```

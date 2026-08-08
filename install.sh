@@ -12,16 +12,16 @@ fi
 
 mkdir -p "$DEST/state"
 cp "$DIR/lid-toggle.sh" "$DIR/lid-battery-guard.sh" "$DIR/lid-settings.sh" "$DEST/"
-chmod +x "$DEST/lid-toggle.sh" "$DEST/lid-battery-guard.sh"
-cp "$DIR/lid.10s.sh" "$PLUGDIR/"
-chmod +x "$PLUGDIR/lid.10s.sh"
+chmod +x "$DEST/lid-toggle.sh" "$DEST/lid-battery-guard.sh" "$DEST/lid-settings.sh"
+cp "$DIR/lidawake.10s.sh" "$PLUGDIR/"
+chmod +x "$PLUGDIR/lidawake.10s.sh"
 
-PLIST="$HOME/Library/LaunchAgents/org.lidgovernor.guard.plist"
+PLIST="$HOME/Library/LaunchAgents/org.lidawake.guard.plist"
 cat > "$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>Label</key><string>org.lidgovernor.guard</string>
+  <key>Label</key><string>org.lidawake.guard</string>
   <key>ProgramArguments</key><array><string>$DEST/lid-battery-guard.sh</string></array>
   <key>StartInterval</key><integer>60</integer>
   <key>RunAtLoad</key><true/>
