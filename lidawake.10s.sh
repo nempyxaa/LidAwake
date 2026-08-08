@@ -71,7 +71,7 @@ echo "---"
 if [ "$FLAG" = 1 ]; then
   echo "$A_TURNOFF | sfimage=moon.zzz.fill bash=$TOGGLE terminal=false refresh=true"
 else
-  echo "$A_KEEP | $ICON_AWAKE bash=$TOGGLE terminal=false refresh=true"
+  echo "$A_KEEP | sfimage=cup.and.saucer.fill bash=$TOGGLE terminal=false refresh=true"
   [ "$AC" = 1 ] && echo "$CAP_AC | color=$C_SEC size=11" || echo "$CAP_BAT | color=$C_SEC size=11"
 fi
 echo "$A_SLEEP | sfimage=zzz bash=/bin/bash param1=-c param2='sudo -n pmset sleepnow' terminal=false"
