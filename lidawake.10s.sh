@@ -48,24 +48,28 @@ case "$L" in
     CAP_BAT="Temporary, reverts under ${BATTERY_FLOOR}%"; CAP_AC="On AC, no battery limit"
     SET="Settings"; SET_NOTIF="Show notifications"; SET_THERM="Auto-sleep when hot"; SET_FLOOR="Battery floor" ;;
 esac
+# appearance-aware colors (single hex per mode; comma pairs don't parse on all SwiftBar builds)
+DARK=0; [ "$(defaults read -g AppleInterfaceStyle 2>/dev/null)" = "Dark" ] && DARK=1
+if [ "$DARK" = 1 ]; then C_HEAD="#ffffff"; C_SEC="#98989d"; else C_HEAD="#1d1d1f"; C_SEC="#6e6e73"; fi
+BOLD="font=.AppleSystemUIFontBold"
 # menu-bar icon
 if [ "$BATOK" = 1 ]; then echo "| sfimage=moon.circle.fill"
 elif [ "$FLAG" = 1 ]; then echo "| sfimage=moon.fill"
 else echo "| sfimage=moon.zzz.fill"; fi
 echo "---"
-# ZONE 1 status
-if [ "$BATOK" = 1 ]; then echo "$S_AWAKE | sfimage=moon.circle.fill color=orange bash=/usr/bin/true terminal=false refresh=false"
-elif [ "$FLAG" = 1 ]; then echo "$S_AWAKE | sfimage=moon.fill bash=/usr/bin/true terminal=false refresh=false"
-else echo "$S_SLEEPS | sfimage=moon.zzz.fill bash=/usr/bin/true terminal=false refresh=false"; fi
-if [ "$AC" = 1 ]; then echo "$S_POWER_AC | size=12 bash=/usr/bin/true terminal=false refresh=false"; else echo "$S_BATTERY ${PCT}% | size=12 bash=/usr/bin/true terminal=false refresh=false"; fi
-[ "$BATOK" = 1 ] && echo "$S_REVERTS | size=11 bash=/usr/bin/true terminal=false refresh=false"
+# ZONE 1 status (disabled = non-clickable, non-highlighting; explicit color = readable, not macOS-dimmed)
+if [ "$BATOK" = 1 ]; then echo "$S_AWAKE | sfimage=moon.circle.fill color=#ff9500 $BOLD"
+elif [ "$FLAG" = 1 ]; then echo "$S_AWAKE | sfimage=moon.fill color=$C_HEAD $BOLD"
+else echo "$S_SLEEPS | sfimage=moon.zzz.fill color=$C_HEAD $BOLD"; fi
+if [ "$AC" = 1 ]; then echo "$S_POWER_AC | color=$C_SEC size=12"; else echo "$S_BATTERY ${PCT}% | color=$C_SEC size=12"; fi
+[ "$BATOK" = 1 ] && echo "$S_REVERTS | color=$C_SEC size=11"
 echo "---"
 # ZONE 2 actions
 if [ "$FLAG" = 1 ]; then
   echo "$A_TURNOFF | sfimage=moon.zzz.fill bash=$TOGGLE terminal=false refresh=true"
 else
   echo "$A_KEEP | sfimage=moon.circle.fill bash=$TOGGLE terminal=false refresh=true"
-  [ "$AC" = 1 ] && echo "$CAP_AC | color=gray size=11" || echo "$CAP_BAT | color=gray size=11"
+  [ "$AC" = 1 ] && echo "$CAP_AC | color=$C_SEC size=11" || echo "$CAP_BAT | color=$C_SEC size=11"
 fi
 echo "$A_SLEEP | sfimage=powersleep bash=/bin/bash param1=-c param2='sudo -n pmset sleepnow' terminal=false"
 echo "---"
