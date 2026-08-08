@@ -11,7 +11,7 @@ if [ -z "$PLUGDIR" ]; then
 fi
 
 mkdir -p "$DEST/state"
-cp "$DIR/lid-toggle.sh" "$DIR/lid-battery-guard.sh" "$DEST/"
+cp "$DIR/lid-toggle.sh" "$DIR/lid-battery-guard.sh" "$DIR/lid-settings.sh" "$DEST/"
 chmod +x "$DEST/lid-toggle.sh" "$DEST/lid-battery-guard.sh"
 cp "$DIR/lid.10s.sh" "$PLUGDIR/"
 chmod +x "$PLUGDIR/lid.10s.sh"

@@ -5,6 +5,10 @@
 NOTIFY_OFF="$HOME/.lid-governor/state/notify-off"
 notify(){ [ -f "$NOTIFY_OFF" ] && return 0; osascript -e "display notification \"$1\" with title \"$2\"" 2>/dev/null; }
 FLAG=$(pmset -g | awk '/SleepDisabled/ {print $2}')
+CONFIG="$HOME/.lid-governor/state/config"
+[ -f "$CONFIG" ] && . "$CONFIG"
+THERMAL_GUARD=${THERMAL_GUARD:-1}
+BATTERY_FLOOR=${BATTERY_FLOOR:-20}
 MARK="$HOME/.lid-governor/state/lid-manual-off"
 BATOK="$HOME/.lid-governor/state/lid-battery-override"
 
@@ -34,7 +38,7 @@ else
     notify "$N_AC_B" "$N_AC_T"
   else
     PCT=$(pmset -g batt | grep -o "[0-9]*%" | tr -d '%' | head -1)
-    if [ -n "$PCT" ] && [ "$PCT" -lt 25 ]; then
+    if [ -n "$PCT" ] && [ "$PCT" -lt $((BATTERY_FLOOR+5)) ]; then
       notify "$N_LOW_B" "$N_LOW_T"
     else
       touch "$BATOK"

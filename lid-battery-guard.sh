@@ -16,6 +16,10 @@ fi
 NOTIFY_OFF="$HOME/.lid-governor/state/notify-off"
 notify(){ [ -f "$NOTIFY_OFF" ] && return 0; osascript -e "display notification \"$1\" with title \"$2\"" 2>/dev/null; }
 FLAG=$(pmset -g | awk '/SleepDisabled/ {print $2}')
+CONFIG="$HOME/.lid-governor/state/config"
+[ -f "$CONFIG" ] && . "$CONFIG"
+THERMAL_GUARD=${THERMAL_GUARD:-1}
+BATTERY_FLOOR=${BATTERY_FLOOR:-20}
 MARK="$HOME/.lid-governor/state/lid-manual-off"          # user declined auto-ON while on AC (session-scoped)
 BATOK="$HOME/.lid-governor/state/lid-battery-override"   # user armed keep-awake on battery (one lid-session)
 CLAM_LAST="$HOME/.lid-governor/state/lid-clamshell-last"
@@ -78,7 +82,7 @@ else
       SL=${SL:-100}
       BPCT=$(pmset -g batt | grep -o "[0-9]*%" | tr -d '%' | head -1)
       echo "$(date -u +%FT%TZ),${BPCT:-?},$SL,sample" >> "$TLOG"
-      if [ "$SL" -lt 100 ]; then
+      if [ "$THERMAL_GUARD" = "1" ] && [ "$SL" -lt 100 ]; then
         echo "$(date -u +%FT%TZ),${BPCT:-?},$SL,forced-sleep" >> "$TLOG"
         rm -f "$BATOK"
         sudo -n pmset -a disablesleep 0
@@ -88,7 +92,7 @@ else
         sudo -n pmset sleepnow
       fi
       PCT=$(pmset -g batt | grep -o "[0-9]*%" | tr -d '%' | head -1)
-      if [ -n "$PCT" ] && [ "$PCT" -lt 20 ]; then
+      if [ -n "$PCT" ] && [ "$PCT" -lt "$BATTERY_FLOOR" ]; then
         rm -f "$BATOK"
         sudo -n pmset -a disablesleep 0
         sudo -n pmset -b lowpowermode 0

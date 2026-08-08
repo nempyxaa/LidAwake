@@ -1,11 +1,5 @@
 # lid-governor
 
-A tiny SwiftBar menu-bar manager for what your MacBook does when you close the lid — with a battery-safe override and minimal heat.
-
-Most keep-awake tools (Amphetamine, caffeinate) leave it to you to remember state. lid-governor is a governor: it has defaults, one-click exceptions, and every exception dies on its own.
-
-# lid-governor
-
 Keep your MacBook running with the lid closed, and never worry that you left it on.
 
 By default, closing the lid sleeps your Mac, exactly like normal. When you actually want it to keep working with the lid shut, you turn that on with one click in the menu bar.
@@ -35,6 +29,12 @@ Menu and notifications are localized from the OS language (English, Russian; Eng
 While it keeps a closed laptop awake on battery, the guard reads `pmset -g therm` every 60s. macOS drops `CPU_Speed_Limit` below 100 the moment it throttles for heat or power. If that happens, the guard forces the Mac to sleep so it cools — you cannot cook a machine in a bag.
 
 Every tick is recorded to `~/.lid-governor/state/thermal-events.csv` (`iso_time,battery_pct,cpu_speed_limit,action`) while an override is active, with a `forced-sleep` row whenever it acts. It is a plain CSV you can open, chart, or share — a record of how your own Mac behaves thermally with the lid shut.
+
+## Adjustable, on by default
+
+Both safety limits are on out of the box and adjustable from the menu:
+- **Thermal auto-sleep** (thermometer icon) — on/off.
+- **Battery floor** (battery icon) — click to cycle 25 / 20 / 15 / 10%. The Mac won't arm an override 5% above the floor, and drops the override at the floor.
 
 ## Battery floors
 
