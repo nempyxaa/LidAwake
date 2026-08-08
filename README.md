@@ -18,15 +18,13 @@ Most keep-awake apps just flip a switch and leave the rest to you. That is how a
 Menu and alerts are in your Mac's language (English or Russian). You can mute the alerts from the menu. Native menu-bar icons, about 200 lines of bash, MIT.
 
 
-Every exception lives exactly one lid cycle. The battery override reverts itself when you open the lid, when battery drops below 20%, or when power state changes — and Low Power Mode is restored on every exit path. Refuses to arm below 25%. All markers die on reboot.
-
-Menu and notifications are localized from the OS language (English, Russian; English fallback). Notifications can be muted from the menu (🔔/🔕) - the state machine keeps working silently.
+Menu and notifications follow your Mac's language (English or Russian, with an English fallback). You can mute notifications from the menu; everything keeps working silently.
 
 
 
 ## Overheating protection
 
-While it keeps a closed laptop awake on battery, the guard checks macOS's own thermal pressure level every 60 seconds (via a tiny bundled helper, `thermalstate`, that reads `NSProcessInfo.thermalState` — works on both Intel and Apple Silicon). If the system reports serious thermal pressure, it puts the Mac to sleep so it can cool, and leaves you a plain note like:
+While it keeps a closed laptop awake on battery, the guard checks macOS's own thermal pressure level every 60 seconds (via a tiny bundled helper, `thermalstate`, that reads `NSProcessInfo.thermalState`, working on both Intel and Apple Silicon). If the system reports serious thermal pressure, it puts the Mac to sleep so it can cool, and leaves you a plain note like:
 
 > Went to sleep due to overheating at 2:35pm on Saturday, 15 Aug
 
@@ -35,8 +33,8 @@ The note shows up in Notification Center, so you see exactly what happened and w
 ## Adjustable, on by default
 
 Both safety limits are on out of the box and adjustable from the menu:
-- **Thermal auto-sleep** (thermometer icon) — on/off.
-- **Battery floor** (battery icon) — click to cycle 25 / 20 / 15 / 10%. The Mac won't arm an override 5% above the floor, and drops the override at the floor.
+- **Thermal auto-sleep** (thermometer icon): on or off.
+- **Battery floor** (battery icon): pick 10, 15, 20, 25, or 30%. The Mac won't arm an override within 5% of the floor, and drops the override at the floor.
 
 ## Battery floors
 
@@ -50,7 +48,7 @@ Both safety limits are on out of the box and adjustable from the menu:
 3. One manual step (the installer prints it): allow passwordless `pmset` via `sudo visudo -f /etc/sudoers.d/lid-awake` with the line
    `yourusername ALL=(root) NOPASSWD: /usr/bin/pmset`
 
-That sudoers line lets the tool run `pmset` as root without a password — it uses `pmset` only to toggle `disablesleep` and `lowpowermode`. Note this grants passwordless `pmset` broadly, not just those two subcommands; scope it further if you prefer. The scripts are plain bash — read them.
+That sudoers line lets the tool run `pmset` as root without a password. It uses `pmset` only to toggle `disablesleep` and `lowpowermode`. Note this grants passwordless `pmset` broadly, not just those two subcommands; scope it further if you prefer. The scripts are plain bash — read them.
 
 ## Uninstall
 
