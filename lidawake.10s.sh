@@ -1,105 +1,60 @@
 #!/bin/bash
-# SwiftBar plugin v4 (07.08.2026): lid behavior status + one-click control.
-# v4: SF Symbol template icons (Apple-style monochrome), Low Power Mode coupling on battery
-# override (min heat), strings localized from OS language (ru/en, fallback en).
+# SwiftBar plugin v5 (08.08.2026): menu redesigned per multi-model UX panel.
+# Sentence case, verbs for actions, checkmark for toggle state, three zones, battery-floor submenu.
+DIR="$HOME/.lid-awake"; STATE="$HOME/.lid-awake/state"; CFG="$HOME/.lid-awake/state/config"; TOGGLE="$HOME/.lid-awake/lid-toggle.sh"; SETTINGS="$HOME/.lid-awake/lid-settings.sh"
+BATOVR="$STATE/lid-battery-override"; NOTIFY_OFF="$STATE/notify-off"
 FLAG=$(pmset -g | awk '/SleepDisabled/ {print $2}')
-BATOK=0
-[ -f "$HOME/.lid-awake/state/lid-battery-override" ] && BATOK=1
-if pmset -g ps | head -1 | grep -q "AC Power"; then AC=1; else AC=0; fi
+[ -f "$BATOVR" ] && BATOK=1 || BATOK=0
+pmset -g ps | head -1 | grep -q "AC Power" && AC=1 || AC=0
 PCT=$(pmset -g batt | grep -o "[0-9]*%" | tr -d '%' | head -1)
-LPM=$(pmset -g | awk '/lowpowermode/ {print $2}')
-CONFIG="$HOME/.lid-awake/state/config"
-[ -f "$CONFIG" ] && . "$CONFIG"
-THERMAL_GUARD=${THERMAL_GUARD:-1}
-BATTERY_FLOOR=${BATTERY_FLOOR:-20}
-NOTIFY_OFF="$HOME/.lid-awake/state/notify-off"
-
+[ -f "$CFG" ] && . "$CFG"
+THERMAL_GUARD=${THERMAL_GUARD:-1}; BATTERY_FLOOR=${BATTERY_FLOOR:-20}; REFUSE=$((BATTERY_FLOOR+5))
+[ -f "$NOTIFY_OFF" ] && NOTIF=0 || NOTIF=1
 L=$(defaults read -g AppleLocale 2>/dev/null | cut -c1-2)
 if [ "$L" = "ru" ]; then
-  T_CLOSED_BAT="Крышка закрыта: работает НА БАТАРЕЕ (оверрайд)"
-  T_AUTOREVERT="Снимется сам: крышка открыта / <20% / питание"
-  T_CLOSED_ON="Крышка закрыта: Mac продолжает работать"
-  T_CLOSED_DEF="Крышка закрыта: Mac заснёт (дефолт)"
-  T_PWR_AC="Питание: сеть"
-  T_PWR_BAT="Питание: батарея"
-  T_LPM_ON="Низкое энергопотребление: вкл (мин. нагрев)"
-  T_DEFAULT="Вернуть дефолт (крышка усыпляет)"
-  T_SLEEPNOW_DEF="Усыпить сейчас (и вернуть дефолт)"
-  T_NIGHT_AC="Включить ночной режим (на питании)"
-  T_BAT_OVR="Работать с закрытой крышкой НА БАТАРЕЕ (временно, мин. нагрев; не даст при <25%)"
-  T_SLEEPNOW="Усыпить сейчас"
-  T_NOTIF_ON="Уведомления вкл, выключить"
-  T_THERM_ON="Тепловая защита: вкл"
-  T_THERM_OFF="Тепловая защита: выкл"
-  T_BFLOOR="Мин. заряд для оверрайда"
-  T_NOTIF_OFF="Уведомления выкл, включить"
+  S_SLEEPS="Крышка закрыта: сон"; S_AWAKE="Крышка закрыта: не спит"
+  S_BATTERY="Батарея:"; S_POWER_AC="Питание: сеть"
+  S_REVERTS="Вернётся: открыл крышку · ниже ${BATTERY_FLOOR}% · зарядка"
+  A_KEEP="Не спать с закрытой крышкой"; A_TURNOFF="Выключить «не спать»"; A_SLEEP="Уснуть сейчас"
+  CAP_BAT="Временно · вернётся ниже ${BATTERY_FLOOR}%"; CAP_AC="На зарядке · без лимита батареи"
+  SET="Настройки"; SET_NOTIF="Показывать уведомления"; SET_THERM="Засыпать при перегреве"; SET_FLOOR="Порог батареи"
 else
-  T_CLOSED_BAT="Lid closed: keeps running ON BATTERY (override)"
-  T_AUTOREVERT="Auto-reverts: lid opened / <20% / power connected"
-  T_CLOSED_ON="Lid closed: Mac keeps running"
-  T_CLOSED_DEF="Lid closed: Mac sleeps (default)"
-  T_PWR_AC="Power: AC"
-  T_PWR_BAT="Power: battery"
-  T_LPM_ON="Low Power Mode: on (min heat)"
-  T_DEFAULT="Back to default (lid sleeps the Mac)"
-  T_SLEEPNOW_DEF="Sleep now (and restore default)"
-  T_NIGHT_AC="Enable night mode (on AC)"
-  T_BAT_OVR="Keep running with lid closed ON BATTERY (temporary, min heat; refused below 25%)"
-  T_SLEEPNOW="Sleep now"
-  T_NOTIF_ON="Notifications on, mute"
-  T_THERM_ON="Thermal auto-sleep: on"
-  T_THERM_OFF="Thermal auto-sleep: off"
-  T_BFLOOR="Battery floor for override"
-  T_NOTIF_OFF="Notifications off, unmute"
+  S_SLEEPS="Lid closed: sleeps"; S_AWAKE="Lid closed: staying awake"
+  S_BATTERY="Battery:"; S_POWER_AC="Power: AC"
+  S_REVERTS="Reverts on: lid open · under ${BATTERY_FLOOR}% · plugged in"
+  A_KEEP="Keep awake with lid closed"; A_TURNOFF="Turn off keep-awake"; A_SLEEP="Sleep now"
+  CAP_BAT="Temporary · reverts under ${BATTERY_FLOOR}%"; CAP_AC="On AC · no battery limit"
+  SET="Settings"; SET_NOTIF="Show notifications"; SET_THERM="Auto-sleep when hot"; SET_FLOOR="Battery floor"
 fi
-
-if [ "$FLAG" = "1" ] && [ "$BATOK" = "1" ]; then
-  echo "| sfimage=moon.circle.fill"
-elif [ "$FLAG" = "1" ] && [ "$AC" = "1" ]; then
-  echo "| sfimage=moon.fill"
-elif [ "$FLAG" = "1" ]; then
-  echo "| sfimage=exclamationmark.triangle.fill"
-else
-  echo "| sfimage=moon.zzz.fill"
-fi
+# menu-bar icon
+if [ "$BATOK" = 1 ]; then echo "| sfimage=moon.circle.fill"
+elif [ "$FLAG" = 1 ]; then echo "| sfimage=moon.fill"
+else echo "| sfimage=moon.zzz.fill"; fi
 echo "---"
-if [ "$FLAG" = "1" ]; then
-  if [ "$BATOK" = "1" ]; then
-    echo "$T_CLOSED_BAT | color=orange"
-    echo "$T_AUTOREVERT | color=gray"
-    [ "$LPM" = "1" ] && echo "$T_LPM_ON | color=gray"
-  else
-    echo "$T_CLOSED_ON | color=green"
-  fi
-else
-  echo "$T_CLOSED_DEF | color=gray"
-fi
-if [ "$AC" = "1" ]; then
-  echo "$T_PWR_AC ✓"
-else
-  echo "$T_PWR_BAT ${PCT}%"
-fi
+# ZONE 1 status
+if [ "$BATOK" = 1 ]; then echo "$S_AWAKE | sfimage=moon.circle.fill color=orange"
+elif [ "$FLAG" = 1 ]; then echo "$S_AWAKE | sfimage=moon.fill color=green"
+else echo "$S_SLEEPS | sfimage=moon.zzz.fill color=gray"; fi
+if [ "$AC" = 1 ]; then echo "$S_POWER_AC | color=gray"; else echo "$S_BATTERY ${PCT}% | color=gray"; fi
+[ "$BATOK" = 1 ] && echo "$S_REVERTS | color=gray size=11"
 echo "---"
-if [ "$FLAG" = "1" ]; then
-  echo "$T_DEFAULT | sfimage=moon.zzz bash=$HOME/.lid-awake/lid-toggle.sh terminal=false refresh=true"
-  echo "$T_SLEEPNOW_DEF | sfimage=powersleep bash=/bin/bash param1=-c param2='rm -f $HOME/.lid-awake/state/lid-battery-override; sudo -n pmset -b lowpowermode 0; sudo -n pmset -a disablesleep 0; sudo -n pmset sleepnow' terminal=false refresh=true"
+# ZONE 2 actions
+if [ "$FLAG" = 1 ]; then
+  echo "$A_TURNOFF | sfimage=moon.zzz.fill bash=$TOGGLE terminal=false refresh=true"
 else
-  if [ "$AC" = "1" ]; then
-    echo "$T_NIGHT_AC | sfimage=moon.fill bash=$HOME/.lid-awake/lid-toggle.sh terminal=false refresh=true"
-  else
-    echo "$T_BAT_OVR | sfimage=moon.circle.fill bash=$HOME/.lid-awake/lid-toggle.sh terminal=false refresh=true"
-  fi
-  echo "$T_SLEEPNOW | sfimage=powersleep bash=/bin/bash param1=-c param2='sudo -n pmset sleepnow' terminal=false"
+  echo "$A_KEEP | sfimage=moon.circle.fill bash=$TOGGLE terminal=false refresh=true"
+  [ "$AC" = 1 ] && echo "$CAP_AC | color=gray size=11" || echo "$CAP_BAT | color=gray size=11"
 fi
+echo "$A_SLEEP | sfimage=powersleep bash=/bin/bash param1=-c param2='sudo -n pmset sleepnow' terminal=false"
 echo "---"
-if [ -f "$NOTIFY_OFF" ]; then
-  echo "$T_NOTIF_OFF | sfimage=bell.slash.fill bash=/bin/bash param1=-c param2='rm -f \"$HOME/.lid-awake/state/notify-off\"' terminal=false refresh=true"
-else
-  echo "$T_NOTIF_ON | sfimage=bell.fill bash=/bin/bash param1=-c param2='mkdir -p \"$HOME/.lid-awake/state\"; touch \"$HOME/.lid-awake/state/notify-off\"' terminal=false refresh=true"
-fi
-if [ "$THERMAL_GUARD" = "1" ]; then
-  echo "$T_THERM_ON | sfimage=thermometer.medium bash=$HOME/.lid-awake/lid-settings.sh param1=$CONFIG param2=THERMAL_GUARD param3=toggle terminal=false refresh=true"
-else
-  echo "$T_THERM_OFF | sfimage=thermometer.low bash=$HOME/.lid-awake/lid-settings.sh param1=$CONFIG param2=THERMAL_GUARD param3=toggle terminal=false refresh=true"
-fi
-echo "$T_BFLOOR: ${BATTERY_FLOOR}% | sfimage=battery.25 bash=$HOME/.lid-awake/lid-settings.sh param1=$CONFIG param2=BATTERY_FLOOR param3=cycle terminal=false refresh=true"
+# ZONE 3 settings submenu
+echo "$SET | sfimage=gearshape"
+[ "$NOTIF" = 1 ] && NM="✓ " || NM=""
+echo "--${NM}$SET_NOTIF | bash=$SETTINGS param1=$CFG param2=NOTIFY param3=toggle terminal=false refresh=true"
+[ "$THERMAL_GUARD" = 1 ] && TM="✓ " || TM=""
+echo "--${TM}$SET_THERM | bash=$SETTINGS param1=$CFG param2=THERMAL_GUARD param3=toggle terminal=false refresh=true"
+echo "--$SET_FLOOR: ${BATTERY_FLOOR}% | sfimage=battery.25"
+for v in 10 15 20 25 30; do
+  [ "$BATTERY_FLOOR" = "$v" ] && ck=" ✓" || ck=""
+  echo "----${v}%${ck} | bash=$SETTINGS param1=$CFG param2=BATTERY_FLOOR param3=set param4=$v terminal=false refresh=true"
+done
