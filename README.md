@@ -13,7 +13,7 @@ Most keep-awake apps just flip a switch and leave the rest to you. That is how a
 - **Closed lid, on power:** keeps running. Turns on by itself when you plug in.
 - **Closed lid, on battery:** stays asleep by default. One click keeps it awake for a while, and also switches on Low Power Mode so a closed laptop stays cool.
 - **Any override ends on its own:** open the lid, unplug, go under 20%, or start overheating, and it reverts.
-- **Won't arm under 25% battery.** Won't cook itself: if the Mac throttles from heat on battery, it sleeps and leaves you a plain dated note.
+- **Battery floor (default 20%):** won't arm an override within 5% of the floor, and drops it at the floor. If the machine hits serious thermal pressure on battery, it sleeps and tells you.
 
 Menu and alerts are in your Mac's language (English or Russian). You can mute the alerts from the menu. Native menu-bar icons, about 200 lines of bash, MIT.
 
@@ -26,7 +26,7 @@ Menu and notifications are localized from the OS language (English, Russian; Eng
 
 ## Overheating protection
 
-While it keeps a closed laptop awake on battery, the guard watches whether macOS is throttling for heat (it reads `pmset -g therm` every 60 seconds). If your Mac starts to overheat, it puts it to sleep so it can cool, and leaves you a plain note like:
+While it keeps a closed laptop awake on battery, the guard checks macOS's own thermal pressure level every 60 seconds (via a tiny bundled helper, `thermalstate`, that reads `NSProcessInfo.thermalState` — works on both Intel and Apple Silicon). If the system reports serious thermal pressure, it puts the Mac to sleep so it can cool, and leaves you a plain note like:
 
 > Went to sleep due to overheating at 2:35pm on Saturday, 15 Aug
 
@@ -40,8 +40,8 @@ Both safety limits are on out of the box and adjustable from the menu:
 
 ## Battery floors
 
-- **Refuses to arm below 25%.**
-- **Revokes an active override below 20%** and lets the Mac sleep.
+- **Refuses to arm within 5% of the battery floor** (default floor 20%, so refuses below 25%).
+- **Revokes an active override at the floor** and lets the Mac sleep. Both adjustable from the menu.
 
 ## Install
 
@@ -50,7 +50,7 @@ Both safety limits are on out of the box and adjustable from the menu:
 3. One manual step (the installer prints it): allow passwordless `pmset` via `sudo visudo -f /etc/sudoers.d/lid-awake` with the line
    `yourusername ALL=(root) NOPASSWD: /usr/bin/pmset`
 
-That sudoers line is the only privilege the tool needs: `pmset` toggles `disablesleep` and `lowpowermode`. All scripts are ~200 lines of plain bash — read them.
+That sudoers line lets the tool run `pmset` as root without a password — it uses `pmset` only to toggle `disablesleep` and `lowpowermode`. Note this grants passwordless `pmset` broadly, not just those two subcommands; scope it further if you prefer. The scripts are plain bash — read them.
 
 ## Uninstall
 

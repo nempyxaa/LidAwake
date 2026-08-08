@@ -28,7 +28,10 @@ LOG="$HOME/.lid-awake/state/lid-guard.log"
 # markers die at boot - defaults always resume after a power cycle
 BOOT=$(sysctl -n kern.boottime | awk -F"sec = |," "{print \$2}")
 for f in "$MARK" "$BATOK"; do
-  [ -f "$f" ] && [ -n "$BOOT" ] && [ "$(stat -f %m "$f")" -lt "$BOOT" ] && rm -f "$f"
+  if [ -f "$f" ] && [ -n "$BOOT" ] && [ "$(stat -f %m "$f")" -lt "$BOOT" ]; then
+    [ "$f" = "$BATOK" ] && sudo -n pmset -b lowpowermode 0
+    rm -f "$f"
+  fi
 done
 
 CLAM=$(ioreg -r -k AppleClamshellState -d 1 2>/dev/null | awk '/AppleClamshellState/ {print ($NF=="Yes")?"closed":"open"}' | head -1)
@@ -42,6 +45,7 @@ NOWS=$(date +%s)
 LASTS=$(cat "$TICK_TS" 2>/dev/null || echo "$NOWS")
 echo "$NOWS" > "$TICK_TS"
 if [ $((NOWS - LASTS)) -gt 420 ] && { [ -f "$MARK" ] || [ -f "$BATOK" ]; }; then
+  [ -f "$BATOK" ] && sudo -n pmset -b lowpowermode 0
   rm -f "$MARK" "$BATOK"
   echo "$(date '+%F %T') exceptions cleared (sleep gap = lid cycle completed)" >> "$LOG"
 fi
@@ -73,12 +77,12 @@ else
   if [ "$FLAG" = "1" ]; then
     if [ -f "$BATOK" ]; then
       # honored override - but never below 20% battery
-      # thermal safety: macOS drops CPU_Speed_Limit below 100 when it throttles for heat/power.
-      # While we keep a closed laptop awake on battery, if it throttles we sleep it and leave a
-      # plain, dated note in Notification Center (plus a one-line text history you can read back).
-      SL=$(pmset -g therm 2>/dev/null | grep -oiE "CPU_Speed_Limit[ 	]*=[ 	]*[0-9]+" | grep -oE "[0-9]+$")
-      SL=${SL:-100}
-      if [ "$THERMAL_GUARD" = "1" ] && [ "$SL" -lt 100 ]; then
+      # thermal safety (universal, Intel + Apple Silicon): read macOS thermal pressure via the
+      # bundled thermalstate helper (NSProcessInfo.thermalState: 0 nominal 1 fair 2 serious 3 critical).
+      # At "serious" or worse, sleep the closed-on-battery machine so it cools.
+      TS=$( "$HOME/.lid-awake/thermalstate" 2>/dev/null )
+      case "$TS" in ''|*[!0-9]*) TS=0 ;; esac   # unreadable -> treat as nominal (helper missing); thermal guard simply no-ops, never false-sleeps
+      if [ "$THERMAL_GUARD" = "1" ] && [ "$TS" -ge 2 ]; then
         rm -f "$BATOK"
         sudo -n pmset -a disablesleep 0
         sudo -n pmset -b lowpowermode 0
@@ -86,11 +90,12 @@ else
         MSG="$G_HOT_PREFIX $WHEN"
         notify "$MSG" "$G_HOT_T"
         echo "$MSG" >> "$HOME/.lid-awake/state/thermal-history.txt"
-        echo "$(date '+%F %T') thermal force-sleep (CPU_Speed_Limit=$SL)" >> "$LOG"
+        echo "$(date '+%F %T') thermal force-sleep (thermalState=$TS)" >> "$LOG"
         sudo -n pmset sleepnow
+        exit 0
       fi
       PCT=$(pmset -g batt | grep -o "[0-9]*%" | tr -d '%' | head -1)
-      if [ -n "$PCT" ] && [ "$PCT" -lt "$BATTERY_FLOOR" ]; then
+      if [ -z "$PCT" ] || [ "$PCT" -lt "$BATTERY_FLOOR" ]; then
         rm -f "$BATOK"
         sudo -n pmset -a disablesleep 0
         sudo -n pmset -b lowpowermode 0

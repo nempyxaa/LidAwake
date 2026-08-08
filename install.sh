@@ -11,11 +11,12 @@ if [ -z "$PLUGDIR" ]; then
 fi
 
 mkdir -p "$DEST/state"
-cp "$DIR/lid-toggle.sh" "$DIR/lid-battery-guard.sh" "$DIR/lid-settings.sh" "$DEST/"
-chmod +x "$DEST/lid-toggle.sh" "$DEST/lid-battery-guard.sh" "$DEST/lid-settings.sh"
+cp "$DIR/lid-toggle.sh" "$DIR/lid-battery-guard.sh" "$DIR/lid-settings.sh" "$DIR/thermalstate" "$DEST/"
+chmod +x "$DEST/lid-toggle.sh" "$DEST/lid-battery-guard.sh" "$DEST/lid-settings.sh" "$DEST/thermalstate"
 cp "$DIR/lidawake.10s.sh" "$PLUGDIR/"
 chmod +x "$PLUGDIR/lidawake.10s.sh"
 
+mkdir -p "$HOME/Library/LaunchAgents"
 PLIST="$HOME/Library/LaunchAgents/org.lidawake.guard.plist"
 cat > "$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -27,6 +28,9 @@ cat > "$PLIST" <<EOF
   <key>RunAtLoad</key><true/>
 </dict></plist>
 EOF
+if ! sudo -n pmset -g >/dev/null 2>&1; then
+  echo "NOTE: passwordless pmset is not set up yet. Add the sudoers line below FIRST, then re-run this installer so the guard can actually control sleep."
+fi
 launchctl unload "$PLIST" 2>/dev/null || true
 launchctl load "$PLIST"
 

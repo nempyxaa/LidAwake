@@ -38,7 +38,7 @@ else
     notify "$N_AC_B" "$N_AC_T"
   else
     PCT=$(pmset -g batt | grep -o "[0-9]*%" | tr -d '%' | head -1)
-    if [ -n "$PCT" ] && [ "$PCT" -lt $((BATTERY_FLOOR+5)) ]; then
+    if [ -z "$PCT" ] || [ "$PCT" -lt $((BATTERY_FLOOR+5)) ]; then
       notify "$N_LOW_B" "$N_LOW_T"
     else
       touch "$BATOK"
