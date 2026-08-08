@@ -77,6 +77,6 @@ echo "--${NM}$SET_NOTIF | bash=$SETTINGS param1=$CFG param2=NOTIFY param3=toggle
 echo "--${TM}$SET_THERM | bash=$SETTINGS param1=$CFG param2=THERMAL_GUARD param3=toggle terminal=false refresh=true"
 echo "--$SET_FLOOR: ${BATTERY_FLOOR}% | sfimage=battery.25"
 for v in 10 15 20 25 30; do
-  [ "$BATTERY_FLOOR" = "$v" ] && lbl="✓ ${v}%" || lbl="${v}%"
+  [ "$BATTERY_FLOOR" = "$v" ] && lbl="${v}%  ✓" || lbl="${v}%"
   echo "----$lbl | bash=$SETTINGS param1=$CFG param2=BATTERY_FLOOR param3=set param4=$v terminal=false refresh=true"
 done
