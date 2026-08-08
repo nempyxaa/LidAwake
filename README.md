@@ -2,6 +2,8 @@
 
 Keep your MacBook running with the lid closed, and it cleans up after itself.
 
+![lid-awake menu](docs/menu.png)
+
 By default, closing the lid sleeps your Mac, exactly like normal. When you actually want it to keep working with the lid shut, you turn that on with one click in the menu bar.
 
 The whole point is what happens after: it turns itself back off. Unplug it, open the lid, drop under 20% battery, or let it start overheating on battery, and it goes back to sleeping normally on its own. You never have to remember you left it awake.
