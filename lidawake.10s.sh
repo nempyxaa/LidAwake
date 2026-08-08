@@ -33,7 +33,7 @@ else echo "| sfimage=moon.zzz.fill"; fi
 echo "---"
 # ZONE 1 status
 if [ "$BATOK" = 1 ]; then echo "$S_AWAKE | sfimage=moon.circle.fill color=orange"
-elif [ "$FLAG" = 1 ]; then echo "$S_AWAKE | sfimage=moon.fill color=green"
+elif [ "$FLAG" = 1 ]; then echo "$S_AWAKE | sfimage=moon.fill color=gray"
 else echo "$S_SLEEPS | sfimage=moon.zzz.fill color=gray"; fi
 if [ "$AC" = 1 ]; then echo "$S_POWER_AC | color=gray"; else echo "$S_BATTERY ${PCT}% | color=gray"; fi
 [ "$BATOK" = 1 ] && echo "$S_REVERTS | color=gray size=11"
