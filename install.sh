@@ -11,7 +11,7 @@ if [ -z "$PLUGDIR" ]; then
 fi
 
 mkdir -p "$DEST/state"
-cp "$DIR/lid-toggle.sh" "$DIR/lid-battery-guard.sh" "$DIR/lid-settings.sh" "$DIR/thermalstate" "$DIR/hammer-moon.png" "$DEST/"
+cp "$DIR/lid-toggle.sh" "$DIR/lid-battery-guard.sh" "$DIR/lid-settings.sh" "$DIR/thermalstate" "$DEST/"
 chmod +x "$DEST/lid-toggle.sh" "$DEST/lid-battery-guard.sh" "$DEST/lid-settings.sh" "$DEST/thermalstate"
 # strip macOS download-quarantine so the thermal helper can run, then verify it does
 xattr -dr com.apple.quarantine "$DEST" 2>/dev/null || true

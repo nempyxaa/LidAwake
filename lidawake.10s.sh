@@ -52,9 +52,8 @@ esac
 DARK=0; [ "$(defaults read -g AppleInterfaceStyle 2>/dev/null)" = "Dark" ] && DARK=1
 if [ "$DARK" = 1 ]; then C_HEAD="#ffffff"; C_SEC="#98989d"; else C_HEAD="#1d1d1f"; C_SEC="#6e6e73"; fi
 BOLD="font=.AppleSystemUIFontBold"
-# awake icon: hammer-crossed-moon template (falls back to the SF moon if the asset is absent)
-HM="$DIR/hammer-moon.png"
-if [ -f "$HM" ]; then ICON_AWAKE="templateImage=$(base64 < "$HM" | tr -d '\n')"; else ICON_AWAKE="sfimage=moon.fill"; fi
+# awake icon: the coffee cup, everywhere an awake state shows
+ICON_AWAKE="sfimage=cup.and.saucer.fill"
 # menu-bar icon
 if [ "$BATOK" = 1 ]; then echo "| $ICON_AWAKE"
 elif [ "$FLAG" = 1 ]; then echo "| $ICON_AWAKE"
