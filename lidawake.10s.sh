@@ -54,11 +54,11 @@ elif [ "$FLAG" = 1 ]; then echo "| sfimage=moon.fill"
 else echo "| sfimage=moon.zzz.fill"; fi
 echo "---"
 # ZONE 1 status
-if [ "$BATOK" = 1 ]; then echo "$S_AWAKE | sfimage=moon.circle.fill color=orange"
-elif [ "$FLAG" = 1 ]; then echo "$S_AWAKE | sfimage=moon.fill color=#000000,#ffffff"
-else echo "$S_SLEEPS | sfimage=moon.zzz.fill color=#000000,#ffffff"; fi
-if [ "$AC" = 1 ]; then echo "$S_POWER_AC | color=#6e6e73,#aeaeb2 size=12"; else echo "$S_BATTERY ${PCT}% | color=#6e6e73,#aeaeb2 size=12"; fi
-[ "$BATOK" = 1 ] && echo "$S_REVERTS | color=#6e6e73,#aeaeb2 size=11"
+if [ "$BATOK" = 1 ]; then echo "$S_AWAKE | sfimage=moon.circle.fill color=orange bash=/usr/bin/true terminal=false refresh=false"
+elif [ "$FLAG" = 1 ]; then echo "$S_AWAKE | sfimage=moon.fill bash=/usr/bin/true terminal=false refresh=false"
+else echo "$S_SLEEPS | sfimage=moon.zzz.fill bash=/usr/bin/true terminal=false refresh=false"; fi
+if [ "$AC" = 1 ]; then echo "$S_POWER_AC | size=12 bash=/usr/bin/true terminal=false refresh=false"; else echo "$S_BATTERY ${PCT}% | size=12 bash=/usr/bin/true terminal=false refresh=false"; fi
+[ "$BATOK" = 1 ] && echo "$S_REVERTS | size=11 bash=/usr/bin/true terminal=false refresh=false"
 echo "---"
 # ZONE 2 actions
 if [ "$FLAG" = 1 ]; then
