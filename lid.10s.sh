@@ -8,6 +8,7 @@ BATOK=0
 if pmset -g ps | head -1 | grep -q "AC Power"; then AC=1; else AC=0; fi
 PCT=$(pmset -g batt | grep -o "[0-9]*%" | tr -d '%' | head -1)
 LPM=$(pmset -g | awk '/lowpowermode/ {print $2}')
+NOTIFY_OFF="$HOME/.lid-governor/state/notify-off"
 
 L=$(defaults read -g AppleLocale 2>/dev/null | cut -c1-2)
 if [ "$L" = "ru" ]; then
@@ -23,6 +24,8 @@ if [ "$L" = "ru" ]; then
   T_NIGHT_AC="Включить ночной режим (на питании)"
   T_BAT_OVR="Работать с закрытой крышкой НА БАТАРЕЕ (временно, мин. нагрев; не даст при <25%)"
   T_SLEEPNOW="Усыпить сейчас"
+  T_NOTIF_ON="🔔 Уведомления: вкл (выключить)"
+  T_NOTIF_OFF="🔕 Уведомления: выкл (включить)"
 else
   T_CLOSED_BAT="Lid closed: keeps running ON BATTERY (override)"
   T_AUTOREVERT="Auto-reverts: lid opened / <20% / power connected"
@@ -36,6 +39,8 @@ else
   T_NIGHT_AC="Enable night mode (on AC)"
   T_BAT_OVR="Keep running with lid closed ON BATTERY (temporary, min heat; refused below 25%)"
   T_SLEEPNOW="Sleep now"
+  T_NOTIF_ON="🔔 Notifications: on (mute)"
+  T_NOTIF_OFF="🔕 Notifications: off (unmute)"
 fi
 
 if [ "$FLAG" = "1" ] && [ "$BATOK" = "1" ]; then
@@ -75,4 +80,10 @@ else
     echo "$T_BAT_OVR | sfimage=moon.circle.fill bash=$HOME/.lid-governor/lid-toggle.sh terminal=false refresh=true"
   fi
   echo "$T_SLEEPNOW | sfimage=powersleep bash=/bin/bash param1=-c param2='sudo -n pmset sleepnow' terminal=false"
+fi
+echo "---"
+if [ -f "$NOTIFY_OFF" ]; then
+  echo "$T_NOTIF_OFF | bash=/bin/bash param1=-c param2='rm -f \"$HOME/.lid-governor/state/notify-off\"' terminal=false refresh=true"
+else
+  echo "$T_NOTIF_ON | bash=/bin/bash param1=-c param2='mkdir -p \"$HOME/.lid-governor/state\"; touch \"$HOME/.lid-governor/state/notify-off\"' terminal=false refresh=true"
 fi

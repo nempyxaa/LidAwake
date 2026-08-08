@@ -13,6 +13,8 @@ else
   G_AC_T="🌙 Lid governor"; G_AC_B="On AC: night mode enabled automatically. Click the moon to disable."
   G_LOW_T="⚠️ Lid governor"; G_LOW_B="Battery below 20%: override revoked, Mac will sleep with the lid closed."; G_BAT_T="💤 Lid governor"; G_BAT_B="On battery: night mode off, the lid sleeps the Mac as usual."
 fi
+NOTIFY_OFF="$HOME/.lid-governor/state/notify-off"
+notify(){ [ -f "$NOTIFY_OFF" ] && return 0; osascript -e "display notification \"$1\" with title \"$2\"" 2>/dev/null; }
 FLAG=$(pmset -g | awk '/SleepDisabled/ {print $2}')
 MARK="$HOME/.lid-governor/state/lid-manual-off"          # user declined auto-ON while on AC (session-scoped)
 BATOK="$HOME/.lid-governor/state/lid-battery-override"   # user armed keep-awake on battery (one lid-session)
@@ -49,7 +51,7 @@ if [ -f "$BATOK" ] && [ "$PREV" = "closed" ] && [ "$CLAM" = "open" ]; then
   rm -f "$BATOK"
   sudo -n pmset -a disablesleep 0
   sudo -n pmset -b lowpowermode 0
-  osascript -e "display notification \"$G_OPEN_B\" with title \"$G_OPEN_T\"" 2>/dev/null
+  notify "$G_OPEN_B" "$G_OPEN_T"
   echo "$(date '+%F %T') battery-override auto-revert (lid opened)" >> "$LOG"
 fi
 
@@ -58,7 +60,7 @@ if pmset -g ps | head -1 | grep -q "AC Power"; then
   rm -f "$BATOK"   # AC logic owns the flag now
   if [ "$FLAG" != "1" ] && [ ! -f "$MARK" ]; then
     sudo -n pmset -a disablesleep 1
-    osascript -e "display notification \"$G_AC_B\" with title \"$G_AC_T\"" 2>/dev/null
+    notify "$G_AC_B" "$G_AC_T"
     echo "$(date '+%F %T') auto-ON (AC)" >> "$LOG"
   fi
 else
@@ -72,12 +74,12 @@ else
         rm -f "$BATOK"
         sudo -n pmset -a disablesleep 0
         sudo -n pmset -b lowpowermode 0
-        osascript -e "display notification \"$G_LOW_B\" with title \"$G_LOW_T\"" 2>/dev/null
+        notify "$G_LOW_B" "$G_LOW_T"
         echo "$(date '+%F %T') battery-override revoked (<20%)" >> "$LOG"
       fi
     else
       sudo -n pmset -a disablesleep 0
-      osascript -e "display notification \"$G_BAT_B\" with title \"$G_BAT_T\"" 2>/dev/null
+      notify "$G_BAT_B" "$G_BAT_T"
       echo "$(date '+%F %T') auto-OFF (battery, no override)" >> "$LOG"
     fi
   fi

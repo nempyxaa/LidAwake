@@ -14,7 +14,7 @@ Most keep-awake tools (Amphetamine, caffeinate) leave it to you to remember stat
 
 Every exception lives exactly one lid cycle. The battery override reverts itself when you open the lid, when battery drops below 20%, or when power state changes — and Low Power Mode is restored on every exit path. Refuses to arm below 25%. All markers die on reboot.
 
-Menu and notifications are localized from the OS language (English, Russian; English fallback).
+Menu and notifications are localized from the OS language (English, Russian; English fallback). Notifications can be muted from the menu (🔔/🔕) - the state machine keeps working silently.
 
 ## Install
 

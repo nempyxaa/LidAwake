@@ -2,6 +2,8 @@
 # Menu-bar toggle v4 (07.08.2026): AC toggles night mode; on BATTERY arms a temporary keep-awake
 # override that now ALSO enables Low Power Mode (min heat, Piotr 06-07.08). Self-reverts as before.
 # Strings localized from OS language (ru/en, fallback en).
+NOTIFY_OFF="$HOME/.lid-governor/state/notify-off"
+notify(){ [ -f "$NOTIFY_OFF" ] && return 0; osascript -e "display notification \"$1\" with title \"$2\"" 2>/dev/null; }
 FLAG=$(pmset -g | awk '/SleepDisabled/ {print $2}')
 MARK="$HOME/.lid-governor/state/lid-manual-off"
 BATOK="$HOME/.lid-governor/state/lid-battery-override"
@@ -24,21 +26,21 @@ if [ "$FLAG" = "1" ]; then
   touch "$MARK"
   sudo -n pmset -b lowpowermode 0
   sudo -n pmset -a disablesleep 0
-  osascript -e "display notification \"$N_OFF_B\" with title \"$N_OFF_T\"" 2>/dev/null
+  notify "$N_OFF_B" "$N_OFF_T"
 else
   if pmset -g ps | head -1 | grep -q "AC Power"; then
     rm -f "$MARK"
     sudo -n pmset -a disablesleep 1
-    osascript -e "display notification \"$N_AC_B\" with title \"$N_AC_T\"" 2>/dev/null
+    notify "$N_AC_B" "$N_AC_T"
   else
     PCT=$(pmset -g batt | grep -o "[0-9]*%" | tr -d '%' | head -1)
     if [ -n "$PCT" ] && [ "$PCT" -lt 25 ]; then
-      osascript -e "display notification \"$N_LOW_B\" with title \"$N_LOW_T\"" 2>/dev/null
+      notify "$N_LOW_B" "$N_LOW_T"
     else
       touch "$BATOK"
       sudo -n pmset -a disablesleep 1
       sudo -n pmset -b lowpowermode 1
-      osascript -e "display notification \"$N_BAT_B\" with title \"$N_BAT_T\"" 2>/dev/null
+      notify "$N_BAT_B" "$N_BAT_T"
     fi
   fi
 fi
