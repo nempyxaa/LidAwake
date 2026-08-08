@@ -17,12 +17,12 @@ if [ "$L" = "ru" ]; then
   N_OFF_T="💤 Ночной режим выключен"; N_OFF_B="Крышка теперь усыпляет Mac как обычно."
   N_AC_T="🌙 Ночной режим включён"; N_AC_B="Mac продолжит работать с закрытой крышкой (на питании)."
   N_LOW_T="⚠️ Не включаю"; N_LOW_B="Батарея <25%, оверрайд не даю, подключи питание."
-  N_BAT_T="🔋🌙 Батарейный оверрайд"; N_BAT_B="ВРЕМЕННО: Mac не уснёт с закрытой крышкой НА БАТАРЕЕ, включён режим низкого энергопотребления (мин. нагрев). Снимется само: открытие крышки, <20%, или питание."
+  N_BAT_T="🔋🌙 Батарейный оверрайд"; N_BAT_B="ВРЕМЕННО: Mac не уснёт с закрытой крышкой НА БАТАРЕЕ, включён режим низкого энергопотребления (мин. нагрев). Снимется само: открытие крышки, <20%, или питание."; N_FAIL_T="⚠️ lid-awake"; N_FAIL_B="Не удалось включить: pmset нужен беспарольный sudo (см. README). Ничего не изменилось."
 else
   N_OFF_T="💤 Night mode off"; N_OFF_B="Closing the lid sleeps the Mac as usual."
   N_AC_T="🌙 Night mode on"; N_AC_B="Mac keeps running with the lid closed (on AC)."
   N_LOW_T="⚠️ Refused"; N_LOW_B="Battery below 25%, override refused, connect power."
-  N_BAT_T="🔋🌙 Battery override"; N_BAT_B="TEMPORARY: Mac stays awake with the lid closed ON BATTERY, Low Power Mode enabled (min heat). Auto-reverts: lid opened, <20%, or power connected."
+  N_BAT_T="🔋🌙 Battery override"; N_BAT_B="TEMPORARY: Mac stays awake with the lid closed ON BATTERY, Low Power Mode enabled (min heat). Auto-reverts: lid opened, <20%, or power connected."; N_FAIL_T="⚠️ lid-awake"; N_FAIL_B="Could not enable keep-awake: pmset needs the passwordless-sudo step (see README). Nothing changed."
 fi
 
 if [ "$FLAG" = "1" ]; then
@@ -35,16 +35,22 @@ else
   if pmset -g ps | head -1 | grep -q "AC Power"; then
     rm -f "$MARK"
     sudo -n pmset -a disablesleep 1
-    notify "$N_AC_B" "$N_AC_T"
+    if [ "$(pmset -g | awk '/SleepDisabled/ {print $2}')" = "1" ]; then
+      notify "$N_AC_B" "$N_AC_T"
+    else
+      notify "$N_FAIL_B" "$N_FAIL_T"
+    fi
   else
     PCT=$(pmset -g batt | grep -o "[0-9]*%" | tr -d '%' | head -1)
     if [ -z "$PCT" ] || [ "$PCT" -lt $((BATTERY_FLOOR+5)) ]; then
       notify "$N_LOW_B" "$N_LOW_T"
     else
-      touch "$BATOK"
       sudo -n pmset -a disablesleep 1
-      sudo -n pmset -b lowpowermode 1
-      notify "$N_BAT_B" "$N_BAT_T"
+      if [ "$(pmset -g | awk '/SleepDisabled/ {print $2}')" = "1" ]; then
+        touch "$BATOK"; sudo -n pmset -b lowpowermode 1; notify "$N_BAT_B" "$N_BAT_T"
+      else
+        notify "$N_FAIL_B" "$N_FAIL_T"
+      fi
     fi
   fi
 fi

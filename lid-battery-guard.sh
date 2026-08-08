@@ -7,11 +7,11 @@ L=$(defaults read -g AppleLocale 2>/dev/null | cut -c1-2)
 if [ "$L" = "ru" ]; then
   G_OPEN_T="💤 lid-awake"; G_OPEN_B="Крышка открыта: батарейный оверрайд снят, дефолт снова сон."
   G_AC_T="🌙 lid-awake"; G_AC_B="На питании: ночной режим включён автоматически. Выключить - клик по луне."
-  G_LOW_T="⚠️ lid-awake"; G_LOW_B="Батарея <20%: оверрайд снят принудительно, Mac уснёт с крышкой."; G_HOT_T="lid-awake"; G_HOT_PREFIX="Ушёл в сон из-за перегрева в"; G_BAT_T="💤 lid-awake"; G_BAT_B="На батарее: ночной режим выключен, крышка усыпляет как обычно."
+  G_LOW_T="⚠️ lid-awake"; G_LOW_B="Батарея <20%: оверрайд снят принудительно, Mac уснёт с крышкой."; G_HOT_T="lid-awake"; G_HOT_PREFIX="Ушёл в сон из-за перегрева в"; G_BAT_T="💤 lid-awake"; G_BAT_B="На батарее: ночной режим выключен, крышка усыпляет как обычно."; G_FAIL_T="⚠️ lid-awake"; G_FAIL_B="Не удалось включить: pmset нужен беспарольный sudo (см. README). Ничего не изменилось."
 else
   G_OPEN_T="💤 lid-awake"; G_OPEN_B="Lid opened: battery override cleared, default sleep restored."
   G_AC_T="🌙 lid-awake"; G_AC_B="On AC: night mode enabled automatically. Click the moon to disable."
-  G_LOW_T="⚠️ lid-awake"; G_LOW_B="Battery below 20%: override revoked, Mac will sleep with the lid closed."; G_HOT_T="lid-awake"; G_HOT_PREFIX="Went to sleep due to overheating at"; G_BAT_T="💤 lid-awake"; G_BAT_B="On battery: night mode off, the lid sleeps the Mac as usual."
+  G_LOW_T="⚠️ lid-awake"; G_LOW_B="Battery below 20%: override revoked, Mac will sleep with the lid closed."; G_HOT_T="lid-awake"; G_HOT_PREFIX="Went to sleep due to overheating at"; G_BAT_T="💤 lid-awake"; G_BAT_B="On battery: night mode off, the lid sleeps the Mac as usual."; G_FAIL_T="⚠️ lid-awake"; G_FAIL_B="Could not enable keep-awake: pmset needs the passwordless-sudo step (see README). Nothing changed."
 fi
 NOTIFY_OFF="$HOME/.lid-awake/state/notify-off"
 notify(){ [ -f "$NOTIFY_OFF" ] && return 0; osascript -e "display notification \"$1\" with title \"$2\"" 2>/dev/null; }
@@ -68,8 +68,11 @@ if pmset -g ps | head -1 | grep -q "AC Power"; then
   rm -f "$BATOK"   # AC logic owns the flag now
   if [ "$FLAG" != "1" ] && [ ! -f "$MARK" ]; then
     sudo -n pmset -a disablesleep 1
-    notify "$G_AC_B" "$G_AC_T"
-    echo "$(date '+%F %T') auto-ON (AC)" >> "$LOG"
+    if [ "$(pmset -g | awk '/SleepDisabled/ {print $2}')" = "1" ]; then
+      notify "$G_AC_B" "$G_AC_T"; echo "$(date '+%F %T') auto-ON (AC)" >> "$LOG"
+    else
+      notify "$G_FAIL_B" "$G_FAIL_T"; echo "$(date '+%F %T') auto-ON FAILED (pmset)" >> "$LOG"
+    fi
   fi
 else
   # Piotr 04.08 final spec: the AC manual-off exception survives power changes - it dies ONLY on
@@ -82,7 +85,7 @@ else
       # At "serious" or worse, sleep the closed-on-battery machine so it cools.
       TS=$( "$HOME/.lid-awake/thermalstate" 2>/dev/null )
       case "$TS" in ''|*[!0-9]*) TS=0 ;; esac   # unreadable -> treat as nominal (helper missing); thermal guard simply no-ops, never false-sleeps
-      if [ "$THERMAL_GUARD" = "1" ] && [ "$TS" -ge 2 ]; then
+      if [ "$THERMAL_GUARD" = "1" ] && [ "$CLAM" = "closed" ] && [ "$TS" -ge 2 ]; then
         rm -f "$BATOK"
         sudo -n pmset -a disablesleep 0
         sudo -n pmset -b lowpowermode 0

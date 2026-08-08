@@ -62,6 +62,11 @@ sudo rm /etc/sudoers.d/lid-awake
 sudo pmset -a disablesleep 0
 ```
 
+
+## Known limitations (please read before trusting it with a long job)
+
+lid-awake is a temporary, opt-in helper, and its overrides are best-effort. Every override clears on reboot. It does not save or restore your previous power settings: when an override ends it sets Low Power Mode and sleep back to macOS defaults (Low Power Mode off, sleep enabled), so if you keep Low Power Mode permanently on, re-enable it yourself afterward. The battery keep-awake override depends on the menu-bar helper continuing to run; if that helper is stopped or crashes while an override is active, your Mac can stay awake with the lid closed on battery until it hits macOS emergency low-battery sleep or you reboot, so quit the override before you walk away if you are unsure it is alive. lid-awake drives sleep via `pmset` and needs a passwordless-sudo rule for it; that rule is broader than strictly necessary, and if it is ever removed or reset (a macOS update can do this) lid-awake warns you rather than silently failing. It is free and provided as-is; test it on a throwaway session before relying on it to keep an unattended job alive.
+
 ## License
 
 MIT
