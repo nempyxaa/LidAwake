@@ -18,7 +18,7 @@ Most keep-awake apps just flip a switch and leave the rest to you. That is how a
 Menu and alerts are in your Mac's language (English or Russian). You can mute the alerts from the menu. Native menu-bar icons, about 200 lines of bash, MIT.
 
 
-Menu and notifications follow your Mac's language (English or Russian, with an English fallback). You can mute notifications from the menu; everything keeps working silently.
+Menu and notifications follow your Mac's language: English, German, French, and Spanish, with English as the fallback. You can mute notifications from the menu; everything keeps working silently.
 
 
 
@@ -48,7 +48,7 @@ Both safety limits are on out of the box and adjustable from the menu:
 3. One manual step (the installer prints it): allow passwordless `pmset` via `sudo visudo -f /etc/sudoers.d/lid-awake` with the line
    `yourusername ALL=(root) NOPASSWD: /usr/bin/pmset`
 
-That sudoers line lets the tool run `pmset` as root without a password. It uses `pmset` only to toggle `disablesleep` and `lowpowermode`. Note this grants passwordless `pmset` broadly, not just those two subcommands; scope it further if you prefer. The scripts are plain bash — read them.
+That sudoers line lets the tool run `pmset` as root without a password. It uses `pmset` only to toggle `disablesleep` and `lowpowermode`. Note this grants passwordless `pmset` broadly, not just those two subcommands; scope it further if you prefer. The scripts are plain bash, so read them.
 
 ## Uninstall
 

@@ -11,21 +11,43 @@ PCT=$(pmset -g batt | grep -o "[0-9]*%" | tr -d '%' | head -1)
 THERMAL_GUARD=${THERMAL_GUARD:-1}; BATTERY_FLOOR=${BATTERY_FLOOR:-20}; REFUSE=$((BATTERY_FLOOR+5))
 [ -f "$NOTIFY_OFF" ] && NOTIF=0 || NOTIF=1
 L=$(defaults read -g AppleLocale 2>/dev/null | cut -c1-2)
-if [ "$L" = "ru" ]; then
-  S_SLEEPS="Крышка закрыта: сон"; S_AWAKE="Крышка закрыта: не спит"
-  S_BATTERY="Батарея:"; S_POWER_AC="Питание: сеть"
-  S_REVERTS="Вернётся: открыл крышку · ниже ${BATTERY_FLOOR}% · зарядка"
-  A_KEEP="Не спать с закрытой крышкой"; A_TURNOFF="Выключить «не спать»"; A_SLEEP="Уснуть сейчас"
-  CAP_BAT="Временно · вернётся ниже ${BATTERY_FLOOR}%"; CAP_AC="На зарядке · без лимита батареи"
-  SET="Настройки"; SET_NOTIF="Показывать уведомления"; SET_THERM="Засыпать при перегреве"; SET_FLOOR="Порог батареи"
-else
-  S_SLEEPS="Lid closed: sleeps"; S_AWAKE="Lid closed: staying awake"
-  S_BATTERY="Battery:"; S_POWER_AC="Power: AC"
-  S_REVERTS="Reverts on: lid open · under ${BATTERY_FLOOR}% · plugged in"
-  A_KEEP="Keep awake with lid closed"; A_TURNOFF="Turn off keep-awake"; A_SLEEP="Sleep now"
-  CAP_BAT="Temporary · reverts under ${BATTERY_FLOOR}%"; CAP_AC="On AC · no battery limit"
-  SET="Settings"; SET_NOTIF="Show notifications"; SET_THERM="Auto-sleep when hot"; SET_FLOOR="Battery floor"
-fi
+case "$L" in
+  de)
+    S_SLEEPS="Deckel zu: Ruhezustand"; S_AWAKE="Deckel zu: bleibt wach"
+    S_BATTERY="Akku:"; S_POWER_AC="Strom: Netz"
+    S_REVERTS="Endet bei: Deckel auf, unter ${BATTERY_FLOOR}%, oder am Netz"
+    A_KEEP="Mit geschlossenem Deckel wach halten"; A_TURNOFF="Wachhalten ausschalten"; A_SLEEP="Jetzt in den Ruhezustand"
+    CAP_BAT="Vorübergehend, endet unter ${BATTERY_FLOOR}%"; CAP_AC="Am Netz, kein Akkulimit"
+    SET="Einstellungen"; SET_NOTIF="Mitteilungen anzeigen"; SET_THERM="Bei Hitze automatisch schlafen"; SET_FLOOR="Akku-Mindeststand" ;;
+  fr)
+    S_SLEEPS="Capot fermé : veille"; S_AWAKE="Capot fermé : reste actif"
+    S_BATTERY="Batterie :"; S_POWER_AC="Alim. : secteur"
+    S_REVERTS="Fin si : capot ouvert, sous ${BATTERY_FLOOR}%, ou secteur"
+    A_KEEP="Rester actif capot fermé"; A_TURNOFF="Désactiver le maintien actif"; A_SLEEP="Mettre en veille"
+    CAP_BAT="Temporaire, fin sous ${BATTERY_FLOOR}%"; CAP_AC="Sur secteur, sans limite de batterie"
+    SET="Réglages"; SET_NOTIF="Afficher les notifications"; SET_THERM="Veille auto en cas de surchauffe"; SET_FLOOR="Seuil de batterie" ;;
+  es)
+    S_SLEEPS="Tapa cerrada: en reposo"; S_AWAKE="Tapa cerrada: sigue activo"
+    S_BATTERY="Batería:"; S_POWER_AC="Corriente: red"
+    S_REVERTS="Termina si: abres la tapa, bajo ${BATTERY_FLOOR}%, o al enchufar"
+    A_KEEP="Mantener activo con la tapa cerrada"; A_TURNOFF="Desactivar mantener activo"; A_SLEEP="Poner en reposo"
+    CAP_BAT="Temporal, termina bajo ${BATTERY_FLOOR}%"; CAP_AC="Con corriente, sin límite de batería"
+    SET="Ajustes"; SET_NOTIF="Mostrar notificaciones"; SET_THERM="Reposo automático si se calienta"; SET_FLOOR="Umbral de batería" ;;
+  ru)
+    S_SLEEPS="Крышка закрыта: сон"; S_AWAKE="Крышка закрыта: не спит"
+    S_BATTERY="Батарея:"; S_POWER_AC="Питание: сеть"
+    S_REVERTS="Вернётся: открыл крышку, ниже ${BATTERY_FLOOR}%, или зарядка"
+    A_KEEP="Не спать с закрытой крышкой"; A_TURNOFF="Выключить «не спать»"; A_SLEEP="Уснуть сейчас"
+    CAP_BAT="Временно, вернётся ниже ${BATTERY_FLOOR}%"; CAP_AC="На зарядке, без лимита батареи"
+    SET="Настройки"; SET_NOTIF="Показывать уведомления"; SET_THERM="Засыпать при перегреве"; SET_FLOOR="Порог батареи" ;;
+  *)
+    S_SLEEPS="Lid closed: sleeps"; S_AWAKE="Lid closed: staying awake"
+    S_BATTERY="Battery:"; S_POWER_AC="Power: AC"
+    S_REVERTS="Reverts on: lid open, under ${BATTERY_FLOOR}%, plugged in"
+    A_KEEP="Keep awake with lid closed"; A_TURNOFF="Turn off keep-awake"; A_SLEEP="Sleep now"
+    CAP_BAT="Temporary, reverts under ${BATTERY_FLOOR}%"; CAP_AC="On AC, no battery limit"
+    SET="Settings"; SET_NOTIF="Show notifications"; SET_THERM="Auto-sleep when hot"; SET_FLOOR="Battery floor" ;;
+esac
 # menu-bar icon
 if [ "$BATOK" = 1 ]; then echo "| sfimage=moon.circle.fill"
 elif [ "$FLAG" = 1 ]; then echo "| sfimage=moon.fill"
