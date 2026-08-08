@@ -17,7 +17,7 @@ Most keep-awake apps just flip a switch and leave the rest to you. That is how a
 - **Any override ends on its own:** open the lid, unplug, go under 20%, or start overheating, and it reverts.
 - **Battery floor (default 20%):** won't arm an override within 5% of the floor, and drops it at the floor. If the machine hits serious thermal pressure on battery, it sleeps and tells you.
 
-Menu and alerts are in your Mac's language (English or Russian). You can mute the alerts from the menu. Native menu-bar icons, about 200 lines of bash, MIT.
+Menu and alerts follow your Mac's language (English, German, French, Spanish). You can mute the alerts from the menu. Native menu-bar icons, about 200 lines of bash, MIT.
 
 
 Menu and notifications follow your Mac's language: English, German, French, and Spanish, with English as the fallback. You can mute notifications from the menu; everything keeps working silently.
