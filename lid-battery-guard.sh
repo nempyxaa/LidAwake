@@ -47,6 +47,13 @@ case "$L" in
 esac
 NOTIFY_OFF="$HOME/.lid-awake/state/notify-off"
 notify(){ [ -f "$NOTIFY_OFF" ] && return 0; osascript -e "display notification \"$1\" with title \"$2\"" 2>/dev/null; }
+revert_verified(){ # C9 symmetry: arming verifies, so must reverting. Re-read after disablesleep 0.
+  revert_verified
+  if [ "$(pmset -g | awk '/SleepDisabled/ {print $2}')" = "1" ]; then
+    echo "$(date '+%F %T') REVERT-VERIFY FAILED (SleepDisabled still 1)" >> "$LOG"
+    return 1
+  fi
+}
 FLAG=$(pmset -g | awk '/SleepDisabled/ {print $2}')
 MARK="$HOME/.lid-awake/state/lid-manual-off"          # user declined auto-ON while on AC (session-scoped)
 BATOK="$HOME/.lid-awake/state/lid-battery-override"   # user armed keep-awake on battery (one lid-session)
@@ -85,7 +92,7 @@ fi
 # battery-override self-revert: lid was closed and is now open -> the work session is over
 if [ -f "$BATOK" ] && [ "$PREV" = "closed" ] && [ "$CLAM" = "open" ]; then
   rm -f "$BATOK"
-  sudo -n pmset -a disablesleep 0
+  revert_verified
   sudo -n pmset -b lowpowermode 0
   notify "$G_OPEN_B" "$G_OPEN_T"
   echo "$(date '+%F %T') battery-override auto-revert (lid opened)" >> "$LOG"
@@ -115,7 +122,7 @@ else
       case "$TS" in ''|*[!0-9]*) TS=0 ;; esac   # unreadable -> treat as nominal (helper missing); thermal guard simply no-ops, never false-sleeps
       if [ "$THERMAL_GUARD" = "1" ] && [ "$CLAM" = "closed" ] && [ "$TS" -ge 2 ]; then
         rm -f "$BATOK"
-        sudo -n pmset -a disablesleep 0
+        revert_verified
         sudo -n pmset -b lowpowermode 0
         WHEN=$(date "+%-I:%M%p on %A, %-d %b" | sed 's/AM/am/; s/PM/pm/')
         MSG="$G_HOT_PREFIX $WHEN"
@@ -128,13 +135,13 @@ else
       PCT=$(pmset -g batt | grep -o "[0-9]*%" | tr -d '%' | head -1)
       if [ -z "$PCT" ] || [ "$PCT" -lt "$BATTERY_FLOOR" ]; then
         rm -f "$BATOK"
-        sudo -n pmset -a disablesleep 0
+        revert_verified
         sudo -n pmset -b lowpowermode 0
         notify "$G_LOW_B" "$G_LOW_T"
         echo "$(date '+%F %T') battery-override revoked (<${BATTERY_FLOOR}%)" >> "$LOG"
       fi
     else
-      sudo -n pmset -a disablesleep 0
+      revert_verified
       notify "$G_BAT_B" "$G_BAT_T"
       echo "$(date '+%F %T') auto-OFF (battery, no override)" >> "$LOG"
     fi
