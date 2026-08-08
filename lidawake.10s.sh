@@ -52,14 +52,17 @@ esac
 DARK=0; [ "$(defaults read -g AppleInterfaceStyle 2>/dev/null)" = "Dark" ] && DARK=1
 if [ "$DARK" = 1 ]; then C_HEAD="#ffffff"; C_SEC="#98989d"; else C_HEAD="#1d1d1f"; C_SEC="#6e6e73"; fi
 BOLD="font=.AppleSystemUIFontBold"
+# awake icon: hammer-crossed-moon template (falls back to the SF moon if the asset is absent)
+HM="$DIR/hammer-moon.png"
+if [ -f "$HM" ]; then ICON_AWAKE="templateImage=$(base64 < "$HM" | tr -d '\n')"; else ICON_AWAKE="sfimage=moon.fill"; fi
 # menu-bar icon
 if [ "$BATOK" = 1 ]; then echo "| sfimage=moon.circle.fill"
-elif [ "$FLAG" = 1 ]; then echo "| sfimage=moon.fill"
+elif [ "$FLAG" = 1 ]; then echo "| $ICON_AWAKE"
 else echo "| sfimage=moon.zzz.fill"; fi
 echo "---"
 # ZONE 1 status (disabled = non-clickable, non-highlighting; explicit color = readable, not macOS-dimmed)
 if [ "$BATOK" = 1 ]; then echo "$S_AWAKE | sfimage=moon.circle.fill color=$C_SEC $BOLD size=15"
-elif [ "$FLAG" = 1 ]; then echo "$S_AWAKE | sfimage=moon.fill color=$C_SEC $BOLD size=15"
+elif [ "$FLAG" = 1 ]; then echo "$S_AWAKE | $ICON_AWAKE color=$C_SEC $BOLD size=15"
 else echo "$S_SLEEPS | sfimage=moon.zzz.fill color=$C_SEC $BOLD size=15"; fi
 if [ "$AC" = 1 ]; then echo "$S_POWER_AC | color=$C_SEC size=12"; else echo "$S_BATTERY ${PCT}% | color=$C_SEC size=12"; fi
 [ "$BATOK" = 1 ] && echo "$S_REVERTS | color=$C_SEC size=11"
