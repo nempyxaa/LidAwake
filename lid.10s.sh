@@ -24,8 +24,8 @@ if [ "$L" = "ru" ]; then
   T_NIGHT_AC="Включить ночной режим (на питании)"
   T_BAT_OVR="Работать с закрытой крышкой НА БАТАРЕЕ (временно, мин. нагрев; не даст при <25%)"
   T_SLEEPNOW="Усыпить сейчас"
-  T_NOTIF_ON="🔔 Уведомления: вкл (выключить)"
-  T_NOTIF_OFF="🔕 Уведомления: выкл (включить)"
+  T_NOTIF_ON="Уведомления вкл, выключить"
+  T_NOTIF_OFF="Уведомления выкл, включить"
 else
   T_CLOSED_BAT="Lid closed: keeps running ON BATTERY (override)"
   T_AUTOREVERT="Auto-reverts: lid opened / <20% / power connected"
@@ -39,8 +39,8 @@ else
   T_NIGHT_AC="Enable night mode (on AC)"
   T_BAT_OVR="Keep running with lid closed ON BATTERY (temporary, min heat; refused below 25%)"
   T_SLEEPNOW="Sleep now"
-  T_NOTIF_ON="🔔 Notifications: on (mute)"
-  T_NOTIF_OFF="🔕 Notifications: off (unmute)"
+  T_NOTIF_ON="Notifications on, mute"
+  T_NOTIF_OFF="Notifications off, unmute"
 fi
 
 if [ "$FLAG" = "1" ] && [ "$BATOK" = "1" ]; then
@@ -48,9 +48,9 @@ if [ "$FLAG" = "1" ] && [ "$BATOK" = "1" ]; then
 elif [ "$FLAG" = "1" ] && [ "$AC" = "1" ]; then
   echo "| sfimage=moon.fill"
 elif [ "$FLAG" = "1" ]; then
-  echo "| sfimage=exclamationmark.triangle"
+  echo "| sfimage=exclamationmark.triangle.fill"
 else
-  echo "| sfimage=moon.zzz"
+  echo "| sfimage=moon.zzz.fill"
 fi
 echo "---"
 if [ "$FLAG" = "1" ]; then
@@ -83,7 +83,7 @@ else
 fi
 echo "---"
 if [ -f "$NOTIFY_OFF" ]; then
-  echo "$T_NOTIF_OFF | bash=/bin/bash param1=-c param2='rm -f \"$HOME/.lid-governor/state/notify-off\"' terminal=false refresh=true"
+  echo "$T_NOTIF_OFF | sfimage=bell.slash.fill bash=/bin/bash param1=-c param2='rm -f \"$HOME/.lid-governor/state/notify-off\"' terminal=false refresh=true"
 else
-  echo "$T_NOTIF_ON | bash=/bin/bash param1=-c param2='mkdir -p \"$HOME/.lid-governor/state\"; touch \"$HOME/.lid-governor/state/notify-off\"' terminal=false refresh=true"
+  echo "$T_NOTIF_ON | sfimage=bell.fill bash=/bin/bash param1=-c param2='mkdir -p \"$HOME/.lid-governor/state\"; touch \"$HOME/.lid-governor/state/notify-off\"' terminal=false refresh=true"
 fi
