@@ -24,11 +24,13 @@ Menu and notifications are localized from the OS language (English, Russian; Eng
 
 
 
-## Thermal safety + learning log
+## Overheating protection
 
-While it keeps a closed laptop awake on battery, the guard reads `pmset -g therm` every 60s. macOS drops `CPU_Speed_Limit` below 100 the moment it throttles for heat or power. If that happens, the guard forces the Mac to sleep so it cools — you cannot cook a machine in a bag.
+While it keeps a closed laptop awake on battery, the guard watches whether macOS is throttling for heat (it reads `pmset -g therm` every 60 seconds). If your Mac starts to overheat, it puts it to sleep so it can cool, and leaves you a plain note like:
 
-Every tick is recorded to `~/.lid-governor/state/thermal-events.csv` (`iso_time,battery_pct,cpu_speed_limit,action`) while an override is active, with a `forced-sleep` row whenever it acts. It is a plain CSV you can open, chart, or share — a record of how your own Mac behaves thermally with the lid shut.
+> Went to sleep due to overheating at 2:35pm on Saturday, 15 Aug
+
+The note shows up in Notification Center, so you see exactly what happened and when. There's also a one-line text history at `~/.lid-governor/thermal-history.txt` if you want to look back.
 
 ## Adjustable, on by default
 
