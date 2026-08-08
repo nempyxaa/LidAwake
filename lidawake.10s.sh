@@ -58,9 +58,9 @@ elif [ "$FLAG" = 1 ]; then echo "| sfimage=moon.fill"
 else echo "| sfimage=moon.zzz.fill"; fi
 echo "---"
 # ZONE 1 status (disabled = non-clickable, non-highlighting; explicit color = readable, not macOS-dimmed)
-if [ "$BATOK" = 1 ]; then echo "$S_AWAKE | sfimage=moon.circle.fill color=#ff9500 $BOLD"
-elif [ "$FLAG" = 1 ]; then echo "$S_AWAKE | sfimage=moon.fill color=$C_HEAD $BOLD"
-else echo "$S_SLEEPS | sfimage=moon.zzz.fill color=$C_HEAD $BOLD"; fi
+if [ "$BATOK" = 1 ]; then echo "$S_AWAKE | sfimage=moon.circle.fill color=#ff9500 $BOLD size=15"
+elif [ "$FLAG" = 1 ]; then echo "$S_AWAKE | sfimage=moon.fill color=$C_HEAD $BOLD size=15"
+else echo "$S_SLEEPS | sfimage=moon.zzz.fill color=$C_HEAD $BOLD size=15"; fi
 if [ "$AC" = 1 ]; then echo "$S_POWER_AC | color=$C_SEC size=12"; else echo "$S_BATTERY ${PCT}% | color=$C_SEC size=12"; fi
 [ "$BATOK" = 1 ] && echo "$S_REVERTS | color=$C_SEC size=11"
 echo "---"
