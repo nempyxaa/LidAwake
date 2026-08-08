@@ -74,7 +74,7 @@ else
   echo "$A_KEEP | $ICON_AWAKE bash=$TOGGLE terminal=false refresh=true"
   [ "$AC" = 1 ] && echo "$CAP_AC | color=$C_SEC size=11" || echo "$CAP_BAT | color=$C_SEC size=11"
 fi
-echo "$A_SLEEP | sfimage=powersleep bash=/bin/bash param1=-c param2='sudo -n pmset sleepnow' terminal=false"
+echo "$A_SLEEP | sfimage=zzz bash=/bin/bash param1=-c param2='sudo -n pmset sleepnow' terminal=false"
 echo "---"
 # ZONE 3 settings submenu
 echo "$SET | sfimage=gearshape"
