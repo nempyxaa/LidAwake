@@ -1,6 +1,6 @@
 # lid-awake
 
-Keep your MacBook running with the lid closed, and never worry that you left it on.
+Keep your MacBook running with the lid closed, and it cleans up after itself.
 
 By default, closing the lid sleeps your Mac, exactly like normal. When you actually want it to keep working with the lid shut, you turn that on with one click in the menu bar.
 
@@ -30,7 +30,7 @@ While it keeps a closed laptop awake on battery, the guard checks macOS's own th
 
 > Went to sleep due to overheating at 2:35pm on Saturday, 15 Aug
 
-The note shows up in Notification Center, so you see exactly what happened and when. There's also a one-line text history at `~/.lid-awake/thermal-history.txt` if you want to look back.
+The note shows up in Notification Center, so you see exactly what happened and when. There's also a one-line text history at `~/.lid-awake/state/thermal-history.txt` if you want to look back.
 
 ## Adjustable, on by default
 
@@ -40,7 +40,7 @@ Both safety limits are on out of the box and adjustable from the menu:
 
 ## Battery floors
 
-- **Refuses to arm within 5% of the battery floor** (default floor 20%, so refuses below 25%).
+- **Refuses to arm within 5% of the battery floor** (e.g. below 25% at the default 20% floor).
 - **Revokes an active override at the floor** and lets the Mac sleep. Both adjustable from the menu.
 
 ## Install

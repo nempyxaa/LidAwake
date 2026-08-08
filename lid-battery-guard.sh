@@ -3,23 +3,23 @@
 # BATTERY -> default SLEEP on lid close, but the menu-bar toggle may arm a TEMPORARY battery override
 # (marker file). The override self-reverts: lid reopen, battery <20%, or power state change.
 
-L=$(defaults read -g AppleLocale 2>/dev/null | cut -c1-2)
-if [ "$L" = "ru" ]; then
-  G_OPEN_T="💤 lid-awake"; G_OPEN_B="Крышка открыта: батарейный оверрайд снят, дефолт снова сон."
-  G_AC_T="🌙 lid-awake"; G_AC_B="На питании: ночной режим включён автоматически. Выключить - клик по луне."
-  G_LOW_T="⚠️ lid-awake"; G_LOW_B="Батарея <20%: оверрайд снят принудительно, Mac уснёт с крышкой."; G_HOT_T="lid-awake"; G_HOT_PREFIX="Ушёл в сон из-за перегрева в"; G_BAT_T="💤 lid-awake"; G_BAT_B="На батарее: ночной режим выключен, крышка усыпляет как обычно."; G_FAIL_T="⚠️ lid-awake"; G_FAIL_B="Не удалось включить: pmset нужен беспарольный sudo (см. README). Ничего не изменилось."
-else
-  G_OPEN_T="💤 lid-awake"; G_OPEN_B="Lid opened: battery override cleared, default sleep restored."
-  G_AC_T="🌙 lid-awake"; G_AC_B="On AC: night mode enabled automatically. Click the moon to disable."
-  G_LOW_T="⚠️ lid-awake"; G_LOW_B="Battery below 20%: override revoked, Mac will sleep with the lid closed."; G_HOT_T="lid-awake"; G_HOT_PREFIX="Went to sleep due to overheating at"; G_BAT_T="💤 lid-awake"; G_BAT_B="On battery: night mode off, the lid sleeps the Mac as usual."; G_FAIL_T="⚠️ lid-awake"; G_FAIL_B="Could not enable keep-awake: pmset needs the passwordless-sudo step (see README). Nothing changed."
-fi
-NOTIFY_OFF="$HOME/.lid-awake/state/notify-off"
-notify(){ [ -f "$NOTIFY_OFF" ] && return 0; osascript -e "display notification \"$1\" with title \"$2\"" 2>/dev/null; }
-FLAG=$(pmset -g | awk '/SleepDisabled/ {print $2}')
 CONFIG="$HOME/.lid-awake/state/config"
 [ -f "$CONFIG" ] && . "$CONFIG"
 THERMAL_GUARD=${THERMAL_GUARD:-1}
 BATTERY_FLOOR=${BATTERY_FLOOR:-20}
+L=$(defaults read -g AppleLocale 2>/dev/null | cut -c1-2)
+if [ "$L" = "ru" ]; then
+  G_OPEN_T="💤 lid-awake"; G_OPEN_B="Крышка открыта: батарейный оверрайд снят, дефолт снова сон."
+  G_AC_T="🌙 lid-awake"; G_AC_B="На питании: ночной режим включён автоматически. Выключить - клик по луне."
+  G_LOW_T="⚠️ lid-awake"; G_LOW_B="Батарея ниже ${BATTERY_FLOOR}%: оверрайд снят, Mac уснёт с крышкой."; G_HOT_T="lid-awake"; G_HOT_PREFIX="Ушёл в сон из-за перегрева в"; G_BAT_T="💤 lid-awake"; G_BAT_B="На батарее: ночной режим выключен, крышка усыпляет как обычно."; G_FAIL_T="⚠️ lid-awake"; G_FAIL_B="Не удалось включить: pmset нужен беспарольный sudo (см. README). Ничего не изменилось."
+else
+  G_OPEN_T="💤 lid-awake"; G_OPEN_B="Lid opened: battery override cleared, default sleep restored."
+  G_AC_T="🌙 lid-awake"; G_AC_B="On AC: night mode enabled automatically. Click the moon to disable."
+  G_LOW_T="⚠️ lid-awake"; G_LOW_B="Battery below ${BATTERY_FLOOR}%: override revoked, Mac will sleep with the lid closed."; G_HOT_T="lid-awake"; G_HOT_PREFIX="Went to sleep due to overheating at"; G_BAT_T="💤 lid-awake"; G_BAT_B="On battery: night mode off, the lid sleeps the Mac as usual."; G_FAIL_T="⚠️ lid-awake"; G_FAIL_B="Could not enable keep-awake: pmset needs the passwordless-sudo step (see README). Nothing changed."
+fi
+NOTIFY_OFF="$HOME/.lid-awake/state/notify-off"
+notify(){ [ -f "$NOTIFY_OFF" ] && return 0; osascript -e "display notification \"$1\" with title \"$2\"" 2>/dev/null; }
+FLAG=$(pmset -g | awk '/SleepDisabled/ {print $2}')
 MARK="$HOME/.lid-awake/state/lid-manual-off"          # user declined auto-ON while on AC (session-scoped)
 BATOK="$HOME/.lid-awake/state/lid-battery-override"   # user armed keep-awake on battery (one lid-session)
 CLAM_LAST="$HOME/.lid-awake/state/lid-clamshell-last"
@@ -103,7 +103,7 @@ else
         sudo -n pmset -a disablesleep 0
         sudo -n pmset -b lowpowermode 0
         notify "$G_LOW_B" "$G_LOW_T"
-        echo "$(date '+%F %T') battery-override revoked (<20%)" >> "$LOG"
+        echo "$(date '+%F %T') battery-override revoked (<${BATTERY_FLOOR}%)" >> "$LOG"
       fi
     else
       sudo -n pmset -a disablesleep 0
