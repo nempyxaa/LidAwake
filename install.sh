@@ -15,7 +15,7 @@ cp "$DIR/lid-toggle.sh" "$DIR/lid-battery-guard.sh" "$DIR/lid-settings.sh" "$DIR
 chmod +x "$DEST/lid-toggle.sh" "$DEST/lid-battery-guard.sh" "$DEST/lid-settings.sh" "$DEST/thermalstate"
 # strip macOS download-quarantine so the thermal helper can run, then verify it does
 xattr -dr com.apple.quarantine "$DEST" 2>/dev/null || true
-TS=$("$DEST/thermalstate" 2>/dev/null)
+TS=$("$DEST/thermalstate" 2>/dev/null || true)
 case "$TS" in
   0|1|2|3) echo "Thermal helper OK (thermalState=$TS)." ;;
   *) echo "WARNING: the thermal helper did not run (Gatekeeper may be blocking it). Thermal auto-sleep will stay INACTIVE until this is resolved; the rest of lid-awake works normally." ;;

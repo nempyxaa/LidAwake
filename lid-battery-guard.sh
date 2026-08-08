@@ -48,7 +48,7 @@ esac
 NOTIFY_OFF="$HOME/.lid-awake/state/notify-off"
 notify(){ [ -f "$NOTIFY_OFF" ] && return 0; osascript -e "display notification \"$1\" with title \"$2\"" 2>/dev/null; }
 revert_verified(){ # C9 symmetry: arming verifies, so must reverting. Re-read after disablesleep 0.
-  revert_verified
+  sudo -n pmset -a disablesleep 0
   if [ "$(pmset -g | awk '/SleepDisabled/ {print $2}')" = "1" ]; then
     echo "$(date '+%F %T') REVERT-VERIFY FAILED (SleepDisabled still 1)" >> "$LOG"
     return 1

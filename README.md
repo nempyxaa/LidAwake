@@ -15,12 +15,9 @@ Most keep-awake apps just flip a switch and leave the rest to you. That is how a
 - **Closed lid, on power:** keeps running. Turns on by itself when you plug in.
 - **Closed lid, on battery:** stays asleep by default. One click keeps it awake for a while, and also switches on Low Power Mode so a closed laptop stays cool.
 - **Any override ends on its own:** open the lid, unplug, go under 20%, or start overheating, and it reverts.
-- **Battery floor (default 20%):** won't arm an override within 5% of the floor, and drops it at the floor. If the machine hits serious thermal pressure on battery, it sleeps and tells you.
+- **Battery floor (default 20%):** won't arm an override within 5% of the floor, and drops it once battery goes under the floor. If the machine hits serious thermal pressure on battery, it sleeps and tells you.
 
-Menu and alerts follow your Mac's language (English, German, French, Spanish). You can mute the alerts from the menu. Native menu-bar icons, about 200 lines of bash, MIT.
-
-
-Menu and notifications follow your Mac's language: English, German, French, and Spanish, with English as the fallback. You can mute notifications from the menu; everything keeps working silently.
+Menu and notifications follow your Mac's language: English, German, French, and Spanish, with English as the fallback. You can mute notifications from the menu; everything keeps working silently. Native menu-bar icons, a few hundred lines of plain bash, MIT.
 
 
 
@@ -36,12 +33,12 @@ The note shows up in Notification Center, so you see exactly what happened and w
 
 Both safety limits are on out of the box and adjustable from the menu:
 - **Thermal auto-sleep** (thermometer icon): on or off.
-- **Battery floor** (battery icon): pick 10, 15, 20, 25, or 30%. The Mac won't arm an override within 5% of the floor, and drops the override at the floor.
+- **Battery floor** (battery icon): pick 10, 15, 20, 25, or 30%. The Mac won't arm an override within 5% of the floor, and drops the override once battery goes under it.
 
 ## Battery floors
 
 - **Refuses to arm within 5% of the battery floor** (e.g. below 25% at the default 20% floor).
-- **Revokes an active override at the floor** and lets the Mac sleep. Both adjustable from the menu.
+- **Revokes an active override once battery goes under the floor** and lets the Mac sleep. Both adjustable from the menu.
 
 ## Install
 
@@ -50,7 +47,7 @@ Both safety limits are on out of the box and adjustable from the menu:
 3. One manual step (the installer prints it): allow passwordless `pmset` via `sudo visudo -f /etc/sudoers.d/lid-awake` with the line
    `yourusername ALL=(root) NOPASSWD: /usr/bin/pmset`
 
-That sudoers line lets the tool run `pmset` as root without a password. It uses `pmset` only to toggle `disablesleep` and `lowpowermode`. Note this grants passwordless `pmset` broadly, not just those two subcommands; scope it further if you prefer. The scripts are plain bash, so read them.
+That sudoers line lets the tool run `pmset` as root without a password. It uses `pmset` for three things: toggling `disablesleep`, toggling `lowpowermode`, and `sleepnow` (the Sleep-now button and the thermal auto-sleep). Note this grants passwordless `pmset` broadly, not just those two subcommands; scope it further if you prefer. The scripts are plain bash, so read them.
 
 ## Uninstall
 
@@ -65,7 +62,7 @@ sudo pmset -a disablesleep 0
 
 ## Known limitations (please read before trusting it with a long job)
 
-lid-awake is a temporary, opt-in helper, and its overrides are best-effort. Every override clears on reboot. It does not save or restore your previous power settings: when an override ends it sets Low Power Mode and sleep back to macOS defaults (Low Power Mode off, sleep enabled), so if you keep Low Power Mode permanently on, re-enable it yourself afterward. The battery keep-awake override depends on the menu-bar helper continuing to run; if that helper is stopped or crashes while an override is active, your Mac can stay awake with the lid closed on battery until it hits macOS emergency low-battery sleep or you reboot, so quit the override before you walk away if you are unsure it is alive. lid-awake drives sleep via `pmset` and needs a passwordless-sudo rule for it; that rule is broader than strictly necessary, and if it is ever removed or reset (a macOS update can do this) lid-awake warns you rather than silently failing. It is free and provided as-is; test it on a throwaway session before relying on it to keep an unattended job alive.
+lid-awake is a temporary, opt-in helper, and its overrides are best-effort. Every override clears on reboot. It does not save or restore your previous power settings: when an override ends it sets Low Power Mode and sleep back to macOS defaults (Low Power Mode off, sleep enabled), so if you keep Low Power Mode permanently on, re-enable it yourself afterward. The battery keep-awake override depends on the background guard (a LaunchAgent running every 60 seconds), not on the menu-bar plugin; if that agent is unloaded or crashes while an override is active, your Mac can stay awake with the lid closed on battery until it hits macOS emergency low-battery sleep or you reboot, so quit the override before you walk away if you are unsure it is alive. lid-awake drives sleep via `pmset` and needs a passwordless-sudo rule for it; that rule is broader than strictly necessary, and if it is ever removed or reset (a macOS update can do this) lid-awake warns you rather than silently failing (via a notification, so this warning is lost if you muted notifications). It is free and provided as-is; test it on a throwaway session before relying on it to keep an unattended job alive.
 
 ## License
 
