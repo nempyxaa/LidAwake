@@ -56,12 +56,12 @@ BOLD="font=.AppleSystemUIFontBold"
 HM="$DIR/hammer-moon.png"
 if [ -f "$HM" ]; then ICON_AWAKE="templateImage=$(base64 < "$HM" | tr -d '\n')"; else ICON_AWAKE="sfimage=moon.fill"; fi
 # menu-bar icon
-if [ "$BATOK" = 1 ]; then echo "| sfimage=moon.circle.fill"
+if [ "$BATOK" = 1 ]; then echo "| $ICON_AWAKE"
 elif [ "$FLAG" = 1 ]; then echo "| $ICON_AWAKE"
 else echo "| sfimage=moon.zzz.fill"; fi
 echo "---"
 # ZONE 1 status (disabled = non-clickable, non-highlighting; explicit color = readable, not macOS-dimmed)
-if [ "$BATOK" = 1 ]; then echo "$S_AWAKE | sfimage=moon.circle.fill color=$C_SEC $BOLD size=15"
+if [ "$BATOK" = 1 ]; then echo "$S_AWAKE | $ICON_AWAKE color=$C_SEC $BOLD size=15"
 elif [ "$FLAG" = 1 ]; then echo "$S_AWAKE | $ICON_AWAKE color=$C_SEC $BOLD size=15"
 else echo "$S_SLEEPS | sfimage=moon.zzz.fill color=$C_SEC $BOLD size=15"; fi
 if [ "$AC" = 1 ]; then echo "$S_POWER_AC | color=$C_SEC size=12"; else echo "$S_BATTERY ${PCT}% | color=$C_SEC size=12"; fi
