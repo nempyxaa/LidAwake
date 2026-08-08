@@ -58,18 +58,18 @@ elif [ "$FLAG" = 1 ]; then echo "| sfimage=moon.fill"
 else echo "| sfimage=moon.zzz.fill"; fi
 echo "---"
 # ZONE 1 status (disabled = non-clickable, non-highlighting; explicit color = readable, not macOS-dimmed)
-if [ "$BATOK" = 1 ]; then echo "$S_AWAKE | sfimage=moon.circle.fill color=#ff9500 $BOLD size=15 bash=/usr/bin/true terminal=false refresh=false"
-elif [ "$FLAG" = 1 ]; then echo "$S_AWAKE | sfimage=moon.fill color=$C_HEAD $BOLD size=15 bash=/usr/bin/true terminal=false refresh=false"
-else echo "$S_SLEEPS | sfimage=moon.zzz.fill color=$C_HEAD $BOLD size=15 bash=/usr/bin/true terminal=false refresh=false"; fi
-if [ "$AC" = 1 ]; then echo "$S_POWER_AC | color=$C_SEC size=12 bash=/usr/bin/true terminal=false refresh=false"; else echo "$S_BATTERY ${PCT}% | color=$C_SEC size=12 bash=/usr/bin/true terminal=false refresh=false"; fi
-[ "$BATOK" = 1 ] && echo "$S_REVERTS | color=$C_SEC size=11 bash=/usr/bin/true terminal=false refresh=false"
+if [ "$BATOK" = 1 ]; then echo "$S_AWAKE | sfimage=moon.circle.fill color=#ff9500 $BOLD size=15"
+elif [ "$FLAG" = 1 ]; then echo "$S_AWAKE | sfimage=moon.fill color=$C_SEC $BOLD size=15"
+else echo "$S_SLEEPS | sfimage=moon.zzz.fill color=$C_SEC $BOLD size=15"; fi
+if [ "$AC" = 1 ]; then echo "$S_POWER_AC | color=$C_SEC size=12"; else echo "$S_BATTERY ${PCT}% | color=$C_SEC size=12"; fi
+[ "$BATOK" = 1 ] && echo "$S_REVERTS | color=$C_SEC size=11"
 echo "---"
 # ZONE 2 actions
 if [ "$FLAG" = 1 ]; then
   echo "$A_TURNOFF | sfimage=moon.zzz.fill bash=$TOGGLE terminal=false refresh=true"
 else
   echo "$A_KEEP | sfimage=moon.circle.fill bash=$TOGGLE terminal=false refresh=true"
-  [ "$AC" = 1 ] && echo "$CAP_AC | color=$C_SEC size=11 bash=/usr/bin/true terminal=false refresh=false" || echo "$CAP_BAT | color=$C_SEC size=11 bash=/usr/bin/true terminal=false refresh=false"
+  [ "$AC" = 1 ] && echo "$CAP_AC | color=$C_SEC size=11" || echo "$CAP_BAT | color=$C_SEC size=11"
 fi
 echo "$A_SLEEP | sfimage=powersleep bash=/bin/bash param1=-c param2='sudo -n pmset sleepnow' terminal=false"
 echo "---"
