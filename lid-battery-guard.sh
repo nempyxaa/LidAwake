@@ -69,6 +69,12 @@ for f in "$MARK" "$BATOK"; do
   fi
 done
 
+# reconcile: BATOK marker with the pmset flag OFF is stale state (external pmset call, crash) -> clear it
+if [ -f "$BATOK" ] && [ "$FLAG" != "1" ]; then
+  sudo -n pmset -b lowpowermode 0; rm -f "$BATOK"
+  echo "$(date '+%F %T') stale-BATOK cleared (flag was off)" >> "$LOG"
+fi
+
 CLAM=$(ioreg -r -k AppleClamshellState -d 1 2>/dev/null | awk '/AppleClamshellState/ {print ($NF=="Yes")?"closed":"open"}' | head -1)
 PREV=$(cat "$CLAM_LAST" 2>/dev/null)
 echo "$CLAM" > "$CLAM_LAST"
