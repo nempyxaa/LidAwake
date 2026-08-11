@@ -1,5 +1,17 @@
 # lid-awake
 
+## Native macOS app (v2.0)
+
+The standalone menu-bar app lives in `native/` and replaces SwiftBar and the guard LaunchAgent. It targets macOS 13 or newer and builds a universal Apple Silicon/Intel bundle:
+
+```sh
+./native/build.sh
+```
+
+The script creates `native/build/lid-awake.app`, ad-hoc signs it, verifies the signature and property list, checks both architectures, and runs the headless state-machine tests. It does not install or launch the app.
+
+The app still needs the existing passwordless `pmset` rule. If that rule is missing, it shows the exact sudoers line with a copy button. Apple notarization will be added after the developer-program fee is paid.
+
 Keep your MacBook running with the lid closed, and it cleans up after itself.
 
 ![lid-awake menu](docs/menu.png)
