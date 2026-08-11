@@ -10,6 +10,8 @@ The standalone menu-bar app lives in `native/` and replaces SwiftBar and the gua
 
 The script creates `native/build/lid-awake.app`, ad-hoc signs it, verifies the signature and property list, checks both architectures, and runs the headless state-machine tests. It does not install or launch the app.
 
+You never have to trust a downloaded binary: the entire app is a few hundred lines of Swift in `native/`, MIT-licensed. Read the code, run the build script, and the result is your own build from source you just reviewed. The Homebrew formula compiles from this same source on your machine; the downloadable .pkg and .app exist only as a convenience for people who skip both.
+
 The app still needs the existing passwordless `pmset` rule. If that rule is missing, it shows the exact sudoers line with a copy button. Apple notarization will be added after the developer-program fee is paid.
 
 Keep your MacBook running with the lid closed, and it cleans up after itself.
