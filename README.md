@@ -1,6 +1,6 @@
 # lid-awake
 
-lid-awake is a native macOS menu-bar app that lets a MacBook keep working with its lid closed. On AC power it enables keep-awake automatically. On battery, the override is temporary and ends when you open the lid, plug in power, cross the battery floor, or hit serious thermal pressure.
+lid-awake is a native macOS menu-bar app that lets a MacBook keep working with its lid closed. On AC power it enables keep-awake automatically. On battery, you can make the override end when the lid opens, keep it through lid cycles until the battery floor or overheating, or choose the contract each time you turn it on. Plugging in power and manual shutoff always clear a battery override.
 
 The app supports macOS 13 and newer. Its menu and notices follow the Mac's language in English, German, French, Spanish, or Russian.
 
@@ -37,11 +37,11 @@ Replace `yourusername` with your macOS account name. If the rule is missing, the
 
 - On AC power, keep-awake turns on unless you manually switched it off.
 - On battery, you can arm an override only at least 5 percentage points above the chosen floor.
-- The override restores normal sleep on lid open, low battery, AC connection, serious thermal pressure, or a guard gap longer than 420 seconds.
+- The override restores normal sleep according to the selected lid contract; low battery, AC connection, serious thermal pressure, and a guard gap longer than 420 seconds always restore it.
 - Every restore checks `SleepDisabled=0` before clearing persisted override state or sending an OFF notice. A failed restore keeps the retry state and tries again on the next 60-second tick, including on AC power.
 - The menu timer has a small tolerance and an App Nap activity assertion for UI freshness. The external LaunchAgent remains the safety authority.
 
-The default battery floor is 20%. You can choose 10, 15, 20, 25, or 30%, disable thermal auto-sleep, and mute notices from Settings.
+The default battery floor is 20%. You can choose 10, 15, 20, 25, or 30%, select the standing battery contract, disable thermal auto-sleep, and mute notices from Settings.
 
 Thermal events are appended to `~/.lid-awake/state/thermal-history.txt`. Guard diagnostics go to `~/.lid-awake/state/lid-guard.log`.
 

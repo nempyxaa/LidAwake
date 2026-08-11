@@ -10,6 +10,7 @@ private struct FaultHarness {
     var sleepDisabled = true
     var batteryOverride = true
     var manualOff = false
+    var batteryContract: BatteryContract?
     var notices: [Notice] = []
     var logs: [String] = []
 
@@ -20,6 +21,7 @@ private struct FaultHarness {
                 if !value && failDisable { logs.append("REVERT-VERIFY FAILED"); notices.append(.revertFailure); return }
                 sleepDisabled = value
             case let .setBatteryOverride(value): batteryOverride = value
+            case let .setBatteryContract(value): batteryContract = value
             case let .setManualOff(value): manualOff = value
             case let .notify(notice): notices.append(notice)
             case let .log(message): logs.append(message)
@@ -33,11 +35,14 @@ private func snapshot(power: PowerSource = .battery, battery: Int? = 80,
                       disabled: Bool = false, override: Bool = false,
                       manual: Bool = false, lid: LidState = .open,
                       previous: LidState = .open, thermal: Int = 0,
-                      floor: Int = 20, elapsed: TimeInterval = 60) -> MachineSnapshot {
+                      floor: Int = 20, elapsed: TimeInterval = 60,
+                      mode: BatteryMode = .lidOpens,
+                      contract: BatteryContract? = nil) -> MachineSnapshot {
     MachineSnapshot(power: power, batteryPercent: battery, sleepDisabled: disabled,
                     batteryOverride: override, manualOff: manual, lid: lid,
                     previousLid: previous, secondsSinceLastTick: elapsed,
-                    thermalState: thermal, thermalGuard: true, batteryFloor: floor)
+                    thermalState: thermal, thermalGuard: true, batteryFloor: floor,
+                    batteryMode: mode, batteryContract: contract)
 }
 
 @main
@@ -52,10 +57,26 @@ private enum StateMachineTestRunner {
         let boundary = StateMachine.toggle(snapshot(battery: 25, floor: 20))
         expect(boundary.effects.contains(.setBatteryOverride(true)), "battery arm is allowed at floor + 5")
 
-        let opened = StateMachine.guardTick(snapshot(disabled: true, override: true, lid: .open, previous: .closed))
-        expect(opened.effects.contains(.setBatteryOverride(false)), "lid-open clears battery override")
-        expect(opened.effects.contains(.setSleepDisabled(false, verify: true)), "lid-open revert is verified")
-        expect(opened.effects.contains(.notify(.lidOpened)), "lid-open records its notification")
+        let opened = StateMachine.guardTick(snapshot(disabled: true, override: true, lid: .open, previous: .closed, mode: .lidOpens))
+        expect(opened.effects.contains(.setBatteryOverride(false)), "mode 1 lid-open clears battery override")
+        expect(opened.effects.contains(.setSleepDisabled(false, verify: true)), "mode 1 lid-open revert is verified")
+        expect(opened.effects.contains(.notify(.lidOpened)), "mode 1 lid-open records its notification")
+
+        let persistentOpen = StateMachine.guardTick(snapshot(disabled: true, override: true, lid: .open, previous: .closed, mode: .floorOrHeat))
+        expect(!persistentOpen.effects.contains(.setBatteryOverride(false)), "mode 2 survives lid open")
+        let persistentClose = StateMachine.guardTick(snapshot(disabled: true, override: true, lid: .closed, previous: .open, mode: .floorOrHeat))
+        expect(!persistentClose.effects.contains(.setBatteryOverride(false)), "mode 2 survives the closing half of a lid cycle")
+        let persistentFloor = StateMachine.guardTick(snapshot(battery: 19, disabled: true, override: true, lid: .closed, mode: .floorOrHeat))
+        expect(persistentFloor.effects.contains(.setBatteryOverride(false)), "mode 2 still reverts at the battery floor")
+        let persistentHot = StateMachine.guardTick(snapshot(disabled: true, override: true, lid: .closed, thermal: 2, mode: .floorOrHeat))
+        expect(persistentHot.effects.contains(.sleepNow), "mode 2 still reverts on thermal pressure")
+
+        let askedLid = StateMachine.guardTick(snapshot(disabled: true, override: true, lid: .open, previous: .closed, mode: .askEachTime, contract: .lidOpens))
+        expect(askedLid.effects.contains(.setBatteryOverride(false)), "mode 3 honors a per-arm lid contract")
+        let askedFloor = StateMachine.guardTick(snapshot(disabled: true, override: true, lid: .open, previous: .closed, mode: .askEachTime, contract: .floorOrHeat))
+        expect(!askedFloor.effects.contains(.setBatteryOverride(false)), "mode 3 honors a per-arm floor/heat contract")
+        let armedAskedFloor = StateMachine.toggle(snapshot(battery: 80, mode: .askEachTime), armContract: .floorOrHeat)
+        expect(armedAskedFloor.effects.contains(.setBatteryContract(.floorOrHeat)), "mode 3 records the chosen contract when arming")
 
         let hot = StateMachine.guardTick(snapshot(disabled: true, override: true, lid: .closed, thermal: 2))
         expect(hot.effects.contains(.sleepNow), "thermal state 2 forces sleep")
@@ -82,6 +103,16 @@ private enum StateMachineTestRunner {
         var killedThenRelaunched = FaultHarness()
         killedThenRelaunched.execute(relaunched)
         expect(killedThenRelaunched.sleepDisabled && killedThenRelaunched.batteryOverride, "simulated kill and persisted-state relaunch preserves a safe active override")
+        let suiteName = "StateMachineTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.set(BatteryMode.askEachTime.rawValue, forKey: "batteryMode")
+        defaults.set(BatteryContract.floorOrHeat.rawValue, forKey: "batteryContract")
+        let relaunchedMode = BatteryMode(rawValue: defaults.integer(forKey: "batteryMode"))
+        let relaunchedContract = BatteryContract(rawValue: defaults.integer(forKey: "batteryContract"))
+        let persistedChoice = StateMachine.guardTick(snapshot(disabled: true, override: true, lid: .open, previous: .closed,
+                                                              mode: relaunchedMode!, contract: relaunchedContract))
+        expect(!persistedChoice.effects.contains(.setBatteryOverride(false)), "standing mode and per-arm contract persist across simulated relaunch")
+        defaults.removePersistentDomain(forName: suiteName)
         let relaunchedUnsafe = StateMachine.guardTick(snapshot(disabled: true, override: false, lid: .closed, previous: .closed, elapsed: 60))
         expect(relaunchedUnsafe.effects.first == .setSleepDisabled(false, verify: true), "relaunch without persisted override fails safe")
 

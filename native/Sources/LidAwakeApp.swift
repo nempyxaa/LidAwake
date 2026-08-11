@@ -8,6 +8,8 @@ private struct Copy {
     let sleeps, awake, battery, ac, reverts: String
     let keep, turnOff, sleep, batteryCaption, acCaption: String
     let settings, notifications, thermal, floor: String
+    let batteryModeHeader, modeLid, modeFloor, modeAsk: String
+    let untilLid, untilFloor, awakeUntilLid, awakeUntilFloor: String
     let offBody, acBody, lowBody, batteryBody, failBody: String
     let openBody, autoACBody, revokedBody, hotPrefix, autoBatteryBody, revertFailBody: String
 
@@ -20,6 +22,8 @@ private struct Copy {
             keep: "Mit geschlossenem Deckel wach halten", turnOff: "Wachhalten ausschalten", sleep: "Jetzt in den Ruhezustand",
             batteryCaption: "Vorübergehend, endet unter \(floor)%", acCaption: "Am Netz, kein Akkulimit",
             settings: "Einstellungen", notifications: "Mitteilungen anzeigen", thermal: "Bei Hitze automatisch schlafen", floor: "Akku-Mindeststand",
+            batteryModeHeader: "Im Akkubetrieb wach bleiben bis", modeLid: "Deckel geöffnet wird", modeFloor: "Akkugrenze oder Überhitzung", modeAsk: "Jedes Mal fragen",
+            untilLid: "Bis der Deckel geöffnet wird", untilFloor: "Bis Akkugrenze oder Überhitzung", awakeUntilLid: "Wach bis: Deckel", awakeUntilFloor: "Wach bis: Akkugrenze/Hitze",
             offBody: "Deckel schließen versetzt den Mac wie gewohnt in den Ruhezustand.", acBody: "Der Mac läuft mit geschlossenem Deckel weiter (am Netz).",
             lowBody: "Akku zu niedrig, Wachhalten abgelehnt, Netzteil anschliessen.",
             batteryBody: "Mac bleibt mit geschlossenem Deckel im Akkubetrieb wach, Stromsparmodus an. Endet bei Deckel auf, wenig Akku oder Netz.",
@@ -34,6 +38,8 @@ private struct Copy {
             keep: "Rester actif capot fermé", turnOff: "Désactiver le maintien actif", sleep: "Mettre en veille",
             batteryCaption: "Temporaire, fin sous \(floor)%", acCaption: "Sur secteur, sans limite de batterie",
             settings: "Réglages", notifications: "Afficher les notifications", thermal: "Veille auto en cas de surchauffe", floor: "Seuil de batterie",
+            batteryModeHeader: "Sur batterie, rester actif jusqu'à", modeLid: "Ouverture du capot", modeFloor: "Seuil de batterie ou surchauffe", modeAsk: "Demander à chaque fois",
+            untilLid: "Jusqu'à l'ouverture du capot", untilFloor: "Jusqu'au seuil de batterie ou à la surchauffe", awakeUntilLid: "Actif jusqu'à : capot", awakeUntilFloor: "Actif jusqu'à : seuil/chaleur",
             offBody: "Fermer le capot met le Mac en veille comme d'habitude.", acBody: "Le Mac continue capot ferme (sur secteur).",
             lowBody: "Batterie trop basse, maintien refuse, branchez l'alimentation.",
             batteryBody: "Le Mac reste actif capot ferme sur batterie, mode economie d'energie active. Fin si capot ouvert, batterie faible ou secteur.",
@@ -48,6 +54,8 @@ private struct Copy {
             keep: "Mantener activo con la tapa cerrada", turnOff: "Desactivar mantener activo", sleep: "Poner en reposo",
             batteryCaption: "Temporal, termina bajo \(floor)%", acCaption: "Con corriente, sin límite de batería",
             settings: "Ajustes", notifications: "Mostrar notificaciones", thermal: "Reposo automático si se calienta", floor: "Umbral de batería",
+            batteryModeHeader: "Con batería, mantener activo hasta", modeLid: "Abrir la tapa", modeFloor: "Umbral de batería o sobrecalentamiento", modeAsk: "Preguntar cada vez",
+            untilLid: "Hasta abrir la tapa", untilFloor: "Hasta el umbral de batería o sobrecalentamiento", awakeUntilLid: "Activo hasta: tapa", awakeUntilFloor: "Activo hasta: umbral/calor",
             offBody: "Cerrar la tapa pone el Mac en reposo como siempre.", acBody: "El Mac sigue con la tapa cerrada (con corriente).",
             lowBody: "Bateria muy baja, se rechazo, conecta la corriente.",
             batteryBody: "El Mac sigue activo con la tapa cerrada en bateria, modo de bajo consumo activado. Termina al abrir, bateria baja o corriente.",
@@ -62,6 +70,8 @@ private struct Copy {
             keep: "Не спать с закрытой крышкой", turnOff: "Выключить «не спать»", sleep: "Уснуть сейчас",
             batteryCaption: "Временно, вернётся ниже \(floor)%", acCaption: "На зарядке, без лимита батареи",
             settings: "Настройки", notifications: "Показывать уведомления", thermal: "Засыпать при перегреве", floor: "Порог батареи",
+            batteryModeHeader: "На батарее не спать до", modeLid: "Открытия крышки", modeFloor: "Порога батареи или перегрева", modeAsk: "Спрашивать каждый раз",
+            untilLid: "До открытия крышки", untilFloor: "До порога батареи или перегрева", awakeUntilLid: "Не спит до: крышка", awakeUntilFloor: "Не спит до: порог/перегрев",
             offBody: "Крышка теперь усыпляет Mac как обычно.", acBody: "Mac продолжит работать с закрытой крышкой (на питании).",
             lowBody: "Батарея слишком низкая, оверрайд не включён, подключи питание.",
             batteryBody: "Mac не уснёт с закрытой крышкой на батарее, включён режим энергосбережения. Снимется само: открытие крышки, низкий заряд, или питание.",
@@ -76,6 +86,8 @@ private struct Copy {
             keep: "Keep awake with lid closed", turnOff: "Turn off keep-awake", sleep: "Sleep now",
             batteryCaption: "Temporary, reverts under \(floor)%", acCaption: "On AC, no battery limit",
             settings: "Settings", notifications: "Show notifications", thermal: "Auto-sleep when hot", floor: "Battery floor",
+            batteryModeHeader: "On battery, keep awake until", modeLid: "Lid opens", modeFloor: "Battery floor or overheating", modeAsk: "Ask each time",
+            untilLid: "Until lid opens", untilFloor: "Until battery floor or overheating", awakeUntilLid: "Awake until: lid", awakeUntilFloor: "Awake until: floor/heat",
             offBody: "Closing the lid sleeps the Mac as usual.", acBody: "Mac keeps running with the lid closed (on AC).",
             lowBody: "Battery too low, override refused, connect power.",
             batteryBody: "Mac stays awake with the lid closed on battery, Low Power Mode on. Reverts on lid open, low battery, or power.",
@@ -119,6 +131,13 @@ private enum Shell {
 private final class RuntimeState {
     private let d = UserDefaults.standard
     var batteryOverride: Bool { get { d.bool(forKey: "batteryOverride") } set { d.set(newValue, forKey: "batteryOverride") } }
+    var batteryContract: BatteryContract? {
+        get { d.object(forKey: "batteryContract").flatMap { ($0 as? NSNumber).flatMap { BatteryContract(rawValue: $0.intValue) } } }
+        set {
+            if let newValue { d.set(newValue.rawValue, forKey: "batteryContract") }
+            else { d.removeObject(forKey: "batteryContract") }
+        }
+    }
     var manualOff: Bool { get { d.bool(forKey: "manualOff") } set { d.set(newValue, forKey: "manualOff") } }
     var priorLid: LidState {
         get { LidState(raw: d.string(forKey: "priorLid")) }
@@ -146,7 +165,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         let peers = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "com.nempyxaa.lid-awake")
             .filter { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier && !$0.isTerminated }
         guard peers.isEmpty else { NSApp.terminate(nil); return }
-        UserDefaults.standard.register(defaults: ["notifications": true, "thermalGuard": true, "batteryFloor": 20])
+        UserDefaults.standard.register(defaults: ["notifications": true, "thermalGuard": true, "batteryFloor": 20, "batteryMode": BatteryMode.lidOpens.rawValue])
         status.menu = NSMenu(); status.menu?.delegate = self
         requestNotificationsIfNeeded()
         configurePersistentServices()
@@ -163,13 +182,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     func runGuardTickHeadless() {
         headless = true
-        UserDefaults.standard.register(defaults: ["notifications": true, "thermalGuard": true, "batteryFloor": 20])
+        UserDefaults.standard.register(defaults: ["notifications": true, "thermalGuard": true, "batteryFloor": 20, "batteryMode": BatteryMode.lidOpens.rawValue])
         reconcileBoot(); guardTick(refresh: false)
     }
 
     func menuWillOpen(_ menu: NSMenu) { refreshMenu() }
 
     private var floor: Int { UserDefaults.standard.integer(forKey: "batteryFloor") }
+    private var batteryMode: BatteryMode { BatteryMode(rawValue: UserDefaults.standard.integer(forKey: "batteryMode")) ?? .lidOpens }
     private var copy: Copy { Copy.current(floor: floor) }
 
     private func snapshot() -> MachineSnapshot {
@@ -177,7 +197,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         return MachineSnapshot(power: powerSource(), batteryPercent: batteryPercent(), sleepDisabled: sleepDisabled(),
             batteryOverride: state.batteryOverride, manualOff: state.manualOff, lid: lidState(), previousLid: state.priorLid,
             secondsSinceLastTick: elapsed, thermalState: ProcessInfo.processInfo.thermalState.rawValue,
-            thermalGuard: UserDefaults.standard.bool(forKey: "thermalGuard"), batteryFloor: floor)
+            thermalGuard: UserDefaults.standard.bool(forKey: "thermalGuard"), batteryFloor: floor,
+            batteryMode: batteryMode, batteryContract: state.batteryContract)
     }
 
     private func guardTick(refresh: Bool = true) {
@@ -188,6 +209,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
 
     @objc private func toggle() { _ = execute(StateMachine.toggle(snapshot())); refreshMenu() }
+    @objc private func armUntilLid() { armBatteryOverride(.lidOpens) }
+    @objc private func armUntilFloor() { armBatteryOverride(.floorOrHeat) }
+    private func armBatteryOverride(_ contract: BatteryContract) {
+        _ = execute(StateMachine.toggle(snapshot(), armContract: contract)); refreshMenu()
+    }
     @objc private func sleepNow() { _ = Shell.pmset(["sleepnow"], sudo: true) }
     @objc private func toggleNotifications() {
         let d = UserDefaults.standard, value = !d.bool(forKey: "notifications"); d.set(value, forKey: "notifications")
@@ -197,6 +223,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         let d = UserDefaults.standard; d.set(!d.bool(forKey: "thermalGuard"), forKey: "thermalGuard"); refreshMenu()
     }
     @objc private func setFloor(_ sender: NSMenuItem) { UserDefaults.standard.set(sender.tag, forKey: "batteryFloor"); refreshMenu() }
+    @objc private func setBatteryMode(_ sender: NSMenuItem) {
+        guard BatteryMode(rawValue: sender.tag) != nil else { return }
+        UserDefaults.standard.set(sender.tag, forKey: "batteryMode"); refreshMenu()
+    }
 
     @discardableResult private func execute(_ decision: Decision) -> Bool {
         for effect in decision.effects {
@@ -209,6 +239,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
                 }
             case let .setLowPowerMode(value): _ = Shell.pmset(["-b", "lowpowermode", value ? "1" : "0"], sudo: true)
             case let .setBatteryOverride(value): state.batteryOverride = value
+            case let .setBatteryContract(value): state.batteryContract = value
             case let .setManualOff(value): state.manualOff = value
             case let .notify(kind): send(kind)
             case let .log(message): appendLog(message)
@@ -228,11 +259,23 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         add(c: s.batteryOverride || s.sleepDisabled ? c.awake : c.sleeps,
             image: s.batteryOverride || s.sleepDisabled ? "cup.and.saucer.fill" : "moon.zzz.fill", enabled: false, to: menu)
         add(c: s.power == .ac ? c.ac : "\(c.battery) \(s.batteryPercent.map(String.init) ?? "?")%", enabled: false, to: menu)
-        if s.batteryOverride { add(c: c.reverts, enabled: false, to: menu) }
+        if s.batteryOverride {
+            let contract = s.batteryMode == .lidOpens ? BatteryContract.lidOpens :
+                s.batteryMode == .floorOrHeat ? BatteryContract.floorOrHeat : s.batteryContract
+            add(c: contract == .floorOrHeat ? c.awakeUntilFloor : c.awakeUntilLid, enabled: false, to: menu)
+        }
         menu.addItem(.separator())
         if s.sleepDisabled { add(c: c.turnOff, image: "moon.zzz.fill", action: #selector(toggle), to: menu) }
         else {
-            add(c: c.keep, image: "cup.and.saucer.fill", action: #selector(toggle), to: menu)
+            if s.power == .battery && s.batteryMode == .askEachTime {
+                let keep = add(c: c.keep, image: "cup.and.saucer.fill", to: menu)
+                let choices = NSMenu()
+                add(c: c.untilLid, action: #selector(armUntilLid), to: choices)
+                add(c: c.untilFloor, action: #selector(armUntilFloor), to: choices)
+                keep.submenu = choices
+            } else {
+                add(c: c.keep, image: "cup.and.saucer.fill", action: #selector(toggle), to: menu)
+            }
             add(c: s.power == .ac ? c.acCaption : c.batteryCaption, enabled: false, to: menu)
         }
         add(c: c.sleep, image: "zzz", action: #selector(sleepNow), to: menu)
@@ -249,14 +292,25 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             let item = NSMenuItem(title: "\(value)%", action: #selector(setFloor(_:)), keyEquivalent: "")
             item.target = self; item.tag = value; item.state = value == floor ? .on : .off; floors.addItem(item)
         }
-        floorItem.submenu = floors; submenu.addItem(floorItem); settings.submenu = submenu; menu.addItem(settings)
-        menu.addItem(.separator())
-        add(c: UIStrings.current.quit, action: #selector(quit), to: menu)
+        floorItem.submenu = floors; submenu.addItem(floorItem)
+        submenu.addItem(.separator())
+        let modeHeader = add(c: c.batteryModeHeader, enabled: false, to: submenu)
+        modeHeader.attributedTitle = NSAttributedString(
+            string: c.batteryModeHeader,
+            attributes: [.font: NSFont.menuFont(ofSize: NSFont.smallSystemFontSize)]
+        )
+        for (mode, title) in [(BatteryMode.lidOpens, c.modeLid), (.floorOrHeat, c.modeFloor), (.askEachTime, c.modeAsk)] {
+            let item = add(c: title, action: #selector(setBatteryMode(_:)), to: submenu)
+            item.tag = mode.rawValue; item.state = mode == batteryMode ? .on : .off
+        }
+        submenu.addItem(.separator())
+        add(c: UIStrings.current.quit, action: #selector(quit), to: submenu)
+        settings.submenu = submenu; menu.addItem(settings)
         status.menu = menu
     }
 
     @objc private func quit() {
-        let cleanup = Decision(effects: [.setSleepDisabled(false, verify: true), .setLowPowerMode(false), .setBatteryOverride(false), .setManualOff(false)])
+        let cleanup = Decision(effects: [.setSleepDisabled(false, verify: true), .setLowPowerMode(false), .setBatteryOverride(false), .setBatteryContract(nil), .setManualOff(false)])
         guard execute(cleanup) else { return }
         unloadGuardAgent(removeFile: true)
         if SMAppService.mainApp.status == .enabled { try? SMAppService.mainApp.unregister() }
@@ -328,7 +382,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         let boot = Shell.run("/usr/sbin/sysctl", ["-n", "kern.boottime"]).1
         if let old = state.bootTime, old != boot {
             if state.batteryOverride { _ = Shell.pmset(["-b", "lowpowermode", "0"], sudo: true) }
-            state.batteryOverride = false; state.manualOff = false; state.priorLid = .unknown; state.lastTick = nil
+            state.batteryOverride = false; state.batteryContract = nil; state.manualOff = false; state.priorLid = .unknown; state.lastTick = nil
         }
         state.bootTime = boot
     }
