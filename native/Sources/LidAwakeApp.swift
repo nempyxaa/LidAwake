@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import Foundation
 import ServiceManagement
 import UserNotifications
@@ -8,7 +9,7 @@ private struct Copy {
     let keep, turnOff, sleep, batteryCaption, acCaption: String
     let settings, notifications, thermal, floor: String
     let offBody, acBody, lowBody, batteryBody, failBody: String
-    let openBody, autoACBody, revokedBody, hotPrefix, autoBatteryBody: String
+    let openBody, autoACBody, revokedBody, hotPrefix, autoBatteryBody, revertFailBody: String
 
     static func current(floor: Int) -> Copy {
         let language = Locale.current.language.languageCode?.identifier ?? "en"
@@ -26,7 +27,7 @@ private struct Copy {
             openBody: "Deckel offen: Akku-Uebersteuerung beendet, Standard-Ruhezustand wieder aktiv.",
             autoACBody: "Am Netz: Nachtmodus automatisch an. Zum Ausschalten den Mond anklicken.",
             revokedBody: "Akku unter \(floor)%: Uebersteuerung beendet, Mac schlaeft bei geschlossenem Deckel.",
-            hotPrefix: "Ruhezustand wegen Ueberhitzung um", autoBatteryBody: "Im Akkubetrieb: Nachtmodus aus, Deckel schliessen versetzt in den Ruhezustand.")
+            hotPrefix: "Ruhezustand wegen Ueberhitzung um", autoBatteryBody: "Im Akkubetrieb: Nachtmodus aus, Deckel schliessen versetzt in den Ruhezustand.", revertFailBody: "Ruhezustand konnte nicht wiederhergestellt werden. lid-awake versucht es in 60 Sekunden erneut.")
         case "fr": return Copy(
             sleeps: "Capot fermé : veille", awake: "Capot fermé : reste actif", battery: "Batterie :", ac: "Alim. : secteur",
             reverts: "Fin si : capot ouvert, sous \(floor)%, ou secteur",
@@ -40,7 +41,7 @@ private struct Copy {
             openBody: "Capot ouvert: derogation batterie terminee, veille par defaut retablie.",
             autoACBody: "Sur secteur: mode nuit active automatiquement. Cliquez la lune pour desactiver.",
             revokedBody: "Batterie sous \(floor)%: derogation terminee, le Mac se met en veille capot ferme.",
-            hotPrefix: "Mise en veille pour surchauffe a", autoBatteryBody: "Sur batterie: mode nuit desactive, fermer le capot met en veille.")
+            hotPrefix: "Mise en veille pour surchauffe a", autoBatteryBody: "Sur batterie: mode nuit desactive, fermer le capot met en veille.", revertFailBody: "Impossible de rétablir la veille. lid-awake réessaiera dans 60 secondes.")
         case "es": return Copy(
             sleeps: "Tapa cerrada: en reposo", awake: "Tapa cerrada: sigue activo", battery: "Batería:", ac: "Corriente: red",
             reverts: "Termina si: abres la tapa, bajo \(floor)%, o al enchufar",
@@ -54,7 +55,7 @@ private struct Copy {
             openBody: "Tapa abierta: anulacion en bateria terminada, reposo por defecto restaurado.",
             autoACBody: "Con corriente: modo noche activado automaticamente. Haz clic en la luna para desactivar.",
             revokedBody: "Bateria bajo \(floor)%: anulacion terminada, el Mac entra en reposo con la tapa cerrada.",
-            hotPrefix: "En reposo por sobrecalentamiento a las", autoBatteryBody: "En bateria: modo noche desactivado, cerrar la tapa pone en reposo.")
+            hotPrefix: "En reposo por sobrecalentamiento a las", autoBatteryBody: "En bateria: modo noche desactivado, cerrar la tapa pone en reposo.", revertFailBody: "No se pudo restaurar el reposo. lid-awake volverá a intentarlo en 60 segundos.")
         case "ru": return Copy(
             sleeps: "Крышка закрыта: сон", awake: "Крышка закрыта: не спит", battery: "Батарея:", ac: "Питание: сеть",
             reverts: "Вернётся: открыл крышку, ниже \(floor)%, или зарядка",
@@ -68,7 +69,7 @@ private struct Copy {
             openBody: "Крышка открыта: батарейный оверрайд снят, дефолт снова сон.",
             autoACBody: "На питании: ночной режим включён автоматически. Выключить - клик по луне.",
             revokedBody: "Батарея ниже \(floor)%: оверрайд снят, Mac уснёт с крышкой.",
-            hotPrefix: "Ушёл в сон из-за перегрева в", autoBatteryBody: "На батарее: ночной режим выключен, крышка усыпляет как обычно.")
+            hotPrefix: "Ушёл в сон из-за перегрева в", autoBatteryBody: "На батарее: ночной режим выключен, крышка усыпляет как обычно.", revertFailBody: "Не удалось вернуть обычный сон. lid-awake повторит попытку через 60 секунд.")
         default: return Copy(
             sleeps: "Lid closed: sleeps", awake: "Lid closed: staying awake", battery: "Battery:", ac: "Power: AC",
             reverts: "Reverts on: lid open, under \(floor)%, plugged in",
@@ -82,7 +83,21 @@ private struct Copy {
             openBody: "Lid opened: battery override cleared, default sleep restored.",
             autoACBody: "On AC: night mode enabled automatically. Click the moon to disable.",
             revokedBody: "Battery below \(floor)%: override revoked, Mac will sleep with the lid closed.",
-            hotPrefix: "Went to sleep due to overheating at", autoBatteryBody: "On battery: night mode off, the lid sleeps the Mac as usual.")
+            hotPrefix: "Went to sleep due to overheating at", autoBatteryBody: "On battery: night mode off, the lid sleeps the Mac as usual.", revertFailBody: "Could not restore normal sleep. lid-awake will retry in 60 seconds.")
+        }
+    }
+}
+
+private struct UIStrings {
+    let quit, moveTitle, moveBody, migrationTitle, migrationBody: String
+    let permissionTitle, permissionBody, copyFix, ok: String
+    static var current: UIStrings {
+        switch Locale.current.language.languageCode?.identifier ?? "en" {
+        case "de": return UIStrings(quit: "Beenden", moveTitle: "lid-awake nach Programme verschieben", moveBody: "Der Sicherheitsdienst und der Anmeldestart werden nur aus /Applications aktiviert. Verschiebe die App dorthin und öffne sie erneut.", migrationTitle: "Alte Version entfernt", migrationBody: "Der alte Hintergrunddienst und das SwiftBar-Plugin wurden entfernt.", permissionTitle: "lid-awake benötigt die Berechtigung für pmset", permissionBody: "Führe diesen Befehl aus: sudo visudo -f /etc/sudoers.d/lid-awake\nFüge dann diese Zeile ein:", copyFix: "Lösung kopieren", ok: "OK")
+        case "fr": return UIStrings(quit: "Quitter", moveTitle: "Déplacez lid-awake dans Applications", moveBody: "Le service de sécurité et l'ouverture de session ne sont activés que depuis /Applications. Déplacez l'app, puis rouvrez-la.", migrationTitle: "Ancienne version supprimée", migrationBody: "L'ancien service en arrière-plan et le plugin SwiftBar ont été supprimés.", permissionTitle: "lid-awake a besoin d'accéder à pmset", permissionBody: "Exécutez : sudo visudo -f /etc/sudoers.d/lid-awake\nAjoutez ensuite cette ligne :", copyFix: "Copier le correctif", ok: "OK")
+        case "es": return UIStrings(quit: "Salir", moveTitle: "Mueve lid-awake a Aplicaciones", moveBody: "El servicio de seguridad y el inicio de sesión solo se activan desde /Applications. Mueve la app allí y vuelve a abrirla.", migrationTitle: "Versión anterior eliminada", migrationBody: "Se eliminaron el servicio anterior y el plugin de SwiftBar.", permissionTitle: "lid-awake necesita permiso para usar pmset", permissionBody: "Ejecuta: sudo visudo -f /etc/sudoers.d/lid-awake\nDespués añade esta línea:", copyFix: "Copiar solución", ok: "Aceptar")
+        case "ru": return UIStrings(quit: "Выйти", moveTitle: "Перемести lid-awake в Программы", moveBody: "Защитный агент и запуск при входе включаются только из /Applications. Перемести приложение туда и открой снова.", migrationTitle: "Старая версия удалена", migrationBody: "Старый фоновый агент и плагин SwiftBar удалены.", permissionTitle: "lid-awake нужен доступ к pmset", permissionBody: "Выполни: sudo visudo -f /etc/sudoers.d/lid-awake\nЗатем добавь строку:", copyFix: "Скопировать", ok: "ОК")
+        default: return UIStrings(quit: "Quit", moveTitle: "Move lid-awake to Applications", moveBody: "The safety agent and login item are enabled only from /Applications. Move the app there, then open it again.", migrationTitle: "Old version removed", migrationBody: "The old background agent and SwiftBar plugin were removed.", permissionTitle: "lid-awake needs permission to run pmset", permissionBody: "Run: sudo visudo -f /etc/sudoers.d/lid-awake\nThen add this line:", copyFix: "Copy fix", ok: "OK")
         }
     }
 }
@@ -120,23 +135,36 @@ private extension LidState {
 
 @MainActor
 private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
-    private let status = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    private lazy var status = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let state = RuntimeState()
     private var timer: Timer?
     private var permissionAlertShown = false
+    private var activity: NSObjectProtocol?
+    private var headless = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let peers = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "com.nempyxaa.lid-awake")
+            .filter { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier && !$0.isTerminated }
+        guard peers.isEmpty else { NSApp.terminate(nil); return }
         UserDefaults.standard.register(defaults: ["notifications": true, "thermalGuard": true, "batteryFloor": 20])
         status.menu = NSMenu(); status.menu?.delegate = self
         requestNotificationsIfNeeded()
-        registerLoginItem()
+        configurePersistentServices()
         reconcileBoot()
         refreshMenu()
         guardTick()
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.guardTick() }
         }
+        timer?.tolerance = 5
+        activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated], reason: "Keep lid-awake safety state fresh")
         if !hasSudoRule() { showSudoFix() }
+    }
+
+    func runGuardTickHeadless() {
+        headless = true
+        UserDefaults.standard.register(defaults: ["notifications": true, "thermalGuard": true, "batteryFloor": 20])
+        reconcileBoot(); guardTick(refresh: false)
     }
 
     func menuWillOpen(_ menu: NSMenu) { refreshMenu() }
@@ -152,14 +180,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             thermalGuard: UserDefaults.standard.bool(forKey: "thermalGuard"), batteryFloor: floor)
     }
 
-    private func guardTick() {
+    private func guardTick(refresh: Bool = true) {
         let s = snapshot()
         execute(StateMachine.guardTick(s))
         state.priorLid = s.lid; state.lastTick = Date()
-        refreshMenu()
+        if refresh { refreshMenu() }
     }
 
-    @objc private func toggle() { execute(StateMachine.toggle(snapshot())); refreshMenu() }
+    @objc private func toggle() { _ = execute(StateMachine.toggle(snapshot())); refreshMenu() }
     @objc private func sleepNow() { _ = Shell.pmset(["sleepnow"], sudo: true) }
     @objc private func toggleNotifications() {
         let d = UserDefaults.standard, value = !d.bool(forKey: "notifications"); d.set(value, forKey: "notifications")
@@ -170,14 +198,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
     @objc private func setFloor(_ sender: NSMenuItem) { UserDefaults.standard.set(sender.tag, forKey: "batteryFloor"); refreshMenu() }
 
-    private func execute(_ decision: Decision) {
+    @discardableResult private func execute(_ decision: Decision) -> Bool {
         for effect in decision.effects {
             switch effect {
             case let .setSleepDisabled(value, verify):
                 _ = Shell.pmset(["-a", "disablesleep", value ? "1" : "0"], sudo: true)
                 if verify && sleepDisabled() != value {
                     appendLog(value ? "auto-ON FAILED (pmset)" : "REVERT-VERIFY FAILED (SleepDisabled still 1)")
-                    if value { send(.failure); showSudoFix(); return }
+                    send(value ? .failure : .revertFailure); showSudoFix(); return false
                 }
             case let .setLowPowerMode(value): _ = Shell.pmset(["-b", "lowpowermode", value ? "1" : "0"], sudo: true)
             case let .setBatteryOverride(value): state.batteryOverride = value
@@ -188,6 +216,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             case .sleepNow: _ = Shell.pmset(["sleepnow"], sudo: true)
             }
         }
+        return true
     }
 
     private func refreshMenu() {
@@ -221,7 +250,18 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             item.target = self; item.tag = value; item.state = value == floor ? .on : .off; floors.addItem(item)
         }
         floorItem.submenu = floors; submenu.addItem(floorItem); settings.submenu = submenu; menu.addItem(settings)
+        menu.addItem(.separator())
+        add(c: UIStrings.current.quit, action: #selector(quit), to: menu)
         status.menu = menu
+    }
+
+    @objc private func quit() {
+        let cleanup = Decision(effects: [.setSleepDisabled(false, verify: true), .setLowPowerMode(false), .setBatteryOverride(false), .setManualOff(false)])
+        guard execute(cleanup) else { return }
+        unloadGuardAgent(removeFile: true)
+        if SMAppService.mainApp.status == .enabled { try? SMAppService.mainApp.unregister() }
+        if let activity { ProcessInfo.processInfo.endActivity(activity) }
+        NSApp.terminate(nil)
     }
 
     @discardableResult private func add(c title: String, image: String? = nil, action: Selector? = nil,
@@ -258,6 +298,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         case .batteryOn: body = c.batteryBody; case .failure: body = c.failBody; case .lidOpened: body = c.openBody
         case .acAutoOn: body = c.autoACBody; case .lowRevoked: body = c.revokedBody
         case .hot: body = "\(c.hotPrefix) \(thermalTimestamp())"; case .batteryAutoOff: body = c.autoBatteryBody
+        case .revertFailure: body = c.revertFailBody
         }
         let content = UNMutableNotificationContent(); content.title = "lid-awake"; content.body = body
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
@@ -291,24 +332,86 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         }
         state.bootTime = boot
     }
-    private func hasSudoRule() -> Bool { Shell.pmset(["-g"], sudo: true).0 == 0 }
+    private var sudoersLine: String {
+        "\(NSUserName()) ALL=(root) NOPASSWD: /usr/bin/pmset -a disablesleep 0, /usr/bin/pmset -a disablesleep 1, /usr/bin/pmset -b lowpowermode 0, /usr/bin/pmset -b lowpowermode 1, /usr/bin/pmset sleepnow"
+    }
+    private func hasSudoRule() -> Bool {
+        Shell.run("/usr/bin/sudo", ["-n", "-l", "/usr/bin/pmset", "-a", "disablesleep", "0"]).0 == 0
+    }
     private func showSudoFix() {
+        guard !headless else { return }
         guard !permissionAlertShown else { return }; permissionAlertShown = true
-        let user = NSUserName(), line = "\(user) ALL=(root) NOPASSWD: /usr/bin/pmset"
-        let alert = NSAlert(); alert.messageText = "lid-awake needs permission to run pmset"
-        alert.informativeText = "Run: sudo visudo -f /etc/sudoers.d/lid-awake\nThen add this line:\n\(line)"
-        alert.addButton(withTitle: "Copy fix"); alert.addButton(withTitle: "OK")
-        if alert.runModal() == .alertFirstButtonReturn { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(line, forType: .string) }
+        let c = UIStrings.current, alert = NSAlert(); alert.messageText = c.permissionTitle
+        alert.informativeText = "\(c.permissionBody)\n\(sudoersLine)"
+        alert.addButton(withTitle: c.copyFix); alert.addButton(withTitle: c.ok)
+        if alert.runModal() == .alertFirstButtonReturn { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(sudoersLine, forType: .string) }
     }
     private func registerLoginItem() {
         guard SMAppService.mainApp.status != .enabled else { return }
         do { try SMAppService.mainApp.register() } catch { appendLog("login item registration failed: \(error.localizedDescription)") }
     }
+
+    private var runsFromApplications: Bool {
+        Bundle.main.bundleURL.standardizedFileURL.path.hasPrefix("/Applications/")
+    }
+    private var guardPlistURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/LaunchAgents/com.nempyxaa.lid-awake.guard.plist")
+    }
+    private func configurePersistentServices() {
+        guard runsFromApplications else {
+            let c = UIStrings.current, alert = NSAlert(); alert.messageText = c.moveTitle; alert.informativeText = c.moveBody
+            alert.addButton(withTitle: c.ok); alert.runModal(); appendLog("persistent services refused outside /Applications"); return
+        }
+        migrateLegacyInstall()
+        installGuardAgent(); registerLoginItem()
+    }
+    private func installGuardAgent() {
+        let executable = Bundle.main.executableURL?.path ?? ""
+        let plist: [String: Any] = ["Label": "com.nempyxaa.lid-awake.guard", "ProgramArguments": [executable, "--guard-tick"], "StartInterval": 60]
+        do {
+            let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+            try FileManager.default.createDirectory(at: guardPlistURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: guardPlistURL, options: .atomic)
+            let domain = "gui/\(getuid())"
+            _ = Shell.run("/bin/launchctl", ["bootout", domain + "/com.nempyxaa.lid-awake.guard"])
+            let result = Shell.run("/bin/launchctl", ["bootstrap", domain, guardPlistURL.path])
+            if result.0 != 0 { appendLog("guard LaunchAgent bootstrap failed") }
+        } catch { appendLog("guard LaunchAgent install failed: \(error.localizedDescription)") }
+    }
+    private func unloadGuardAgent(removeFile: Bool) {
+        _ = Shell.run("/bin/launchctl", ["bootout", "gui/\(getuid())/com.nempyxaa.lid-awake.guard"])
+        if removeFile { try? FileManager.default.removeItem(at: guardPlistURL) }
+    }
+    private func migrateLegacyInstall() {
+        guard !UserDefaults.standard.bool(forKey: "nativeMigrationCompleted") else { return }
+        let fm = FileManager.default, home = fm.homeDirectoryForCurrentUser
+        let oldPlist = home.appendingPathComponent("Library/LaunchAgents/org.lidawake.guard.plist")
+        var removed = false
+        if fm.fileExists(atPath: oldPlist.path) {
+            _ = Shell.run("/bin/launchctl", ["bootout", "gui/\(getuid())", oldPlist.path])
+            try? fm.removeItem(at: oldPlist); removed = true
+        }
+        let pluginDirectory = Shell.run("/usr/bin/defaults", ["read", "com.ameba.SwiftBar", "PluginDirectory"]).1
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if !pluginDirectory.isEmpty {
+            let plugin = URL(fileURLWithPath: pluginDirectory).appendingPathComponent("lidawake.10s.sh")
+            if fm.fileExists(atPath: plugin.path) { try? fm.removeItem(at: plugin); removed = true }
+        }
+        UserDefaults.standard.set(true, forKey: "nativeMigrationCompleted")
+        if removed {
+            let c = UIStrings.current, alert = NSAlert(); alert.messageText = c.migrationTitle; alert.informativeText = c.migrationBody
+            alert.addButton(withTitle: c.ok); alert.runModal()
+        }
+    }
 }
 
 @main
+@MainActor
 struct LidAwakeApp {
     static func main() {
+        if CommandLine.arguments.dropFirst().contains("--guard-tick") {
+            let delegate = AppDelegate(); delegate.runGuardTickHeadless(); return
+        }
         let app = NSApplication.shared, delegate = AppDelegate()
         app.delegate = delegate; app.setActivationPolicy(.accessory); app.run()
     }

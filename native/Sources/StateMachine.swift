@@ -18,7 +18,7 @@ struct MachineSnapshot {
 }
 
 enum Notice: Equatable {
-    case off, acOn, lowRefusal, batteryOn, failure
+    case off, acOn, lowRefusal, batteryOn, failure, revertFailure
     case lidOpened, acAutoOn, lowRevoked, hot, batteryAutoOff
 }
 
@@ -42,8 +42,8 @@ enum StateMachine {
     static func toggle(_ s: MachineSnapshot) -> Decision {
         if s.sleepDisabled {
             return Decision(effects: [
-                .setBatteryOverride(false), .setManualOff(true),
-                .setLowPowerMode(false), .setSleepDisabled(false, verify: false), .notify(.off)
+                .setManualOff(true), .setSleepDisabled(false, verify: true),
+                .setLowPowerMode(false), .setBatteryOverride(false), .notify(.off)
             ])
         }
         if s.power == .ac {
@@ -68,6 +68,7 @@ enum StateMachine {
             override = false
         }
         if s.secondsSinceLastTick > 420 && (override || manual) {
+            if s.power == .battery && s.sleepDisabled { e.append(.setSleepDisabled(false, verify: true)) }
             if override { e.append(.setLowPowerMode(false)) }
             e += [.setBatteryOverride(false), .setManualOff(false), .log("exceptions cleared (sleep gap = lid cycle completed)")]
             override = false; manual = false
@@ -78,9 +79,15 @@ enum StateMachine {
             manual = false
         }
         if opened && override {
-            e += [.setBatteryOverride(false), .setSleepDisabled(false, verify: true),
-                  .setLowPowerMode(false), .notify(.lidOpened), .log("battery-override auto-revert (lid opened)")]
+            e += [.setSleepDisabled(false, verify: true), .setLowPowerMode(false),
+                  .setBatteryOverride(false), .notify(.lidOpened), .log("battery-override auto-revert (lid opened)")]
             override = false
+        }
+
+        if manual && s.sleepDisabled {
+            e += [.setSleepDisabled(false, verify: true), .setLowPowerMode(false),
+                  .setBatteryOverride(false), .notify(.off), .log("manual-OFF retry succeeded")]
+            return Decision(effects: e)
         }
 
         if s.power == .ac {
@@ -94,14 +101,14 @@ enum StateMachine {
         guard s.sleepDisabled else { return Decision(effects: e) }
         if override {
             if s.thermalGuard && s.lid == .closed && s.thermalState >= 2 {
-                e += [.setBatteryOverride(false), .setSleepDisabled(false, verify: true),
-                      .setLowPowerMode(false), .notify(.hot), .thermalHistory,
+                e += [.setSleepDisabled(false, verify: true), .setLowPowerMode(false),
+                      .setBatteryOverride(false), .notify(.hot), .thermalHistory,
                       .log("thermal force-sleep (thermalState=\(s.thermalState))"), .sleepNow]
                 return Decision(effects: e, terminal: true)
             }
             if s.batteryPercent == nil || s.batteryPercent! < s.batteryFloor {
-                e += [.setBatteryOverride(false), .setSleepDisabled(false, verify: true),
-                      .setLowPowerMode(false), .notify(.lowRevoked),
+                e += [.setSleepDisabled(false, verify: true), .setLowPowerMode(false),
+                      .setBatteryOverride(false), .notify(.lowRevoked),
                       .log("battery-override revoked (<\(s.batteryFloor)%)")]
             }
         } else {

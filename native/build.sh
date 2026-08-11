@@ -21,7 +21,12 @@ xcrun lipo -create "$OUT/arm64/lid-awake" "$OUT/x86_64/lid-awake" -output "$APP/
 codesign --force --deep --sign - "$APP"
 plutil -lint "$APP/Contents/Info.plist"
 codesign --verify --deep --strict "$APP"
-xcrun lipo -archs "$APP/Contents/MacOS/lid-awake"
+ARCHS="$(xcrun lipo -archs "$APP/Contents/MacOS/lid-awake" | tr ' ' '\n' | sort | xargs)"
+if [[ "$ARCHS" != "arm64 x86_64" ]]; then
+  echo "unexpected executable architectures: $ARCHS" >&2
+  exit 1
+fi
+echo "$ARCHS"
 
 swiftc -module-cache-path "$OUT/test-module-cache" \
   "$NATIVE/Sources/StateMachine.swift" "$NATIVE/Tests/StateMachineTests.swift" -o "$OUT/state-machine-tests"

@@ -1,21 +1,7 @@
 # Native build
 
-`build.sh` compiles `lid-awake.app` for arm64 and x86_64, merges the binaries with `lipo`, ad-hoc signs the bundle, and runs the state-machine tests. It requires the macOS Command Line Tools and does not launch or install the result.
+Run `./native/build.sh` from the repository root. It creates the universal, ad-hoc signed app at `native/build/lid-awake.app` and runs the headless tests. The script does not install or launch the result.
 
-```sh
-./native/build.sh
-```
+Move the finished app to `/Applications` before opening it. The app will not register its login item or 60-second safety LaunchAgent from `native/build` or another unstable path.
 
-Output: `native/build/lid-awake.app`
-
-The app targets macOS 13 or newer. It runs only in the menu bar (`LSUIElement=1`), registers itself as a login item through `SMAppService`, and replaces the old 60-second LaunchAgent with an internal timer.
-
-The only privileged dependency is the existing sudoers rule:
-
-```text
-yourusername ALL=(root) NOPASSWD: /usr/bin/pmset
-```
-
-Use `sudo visudo -f /etc/sudoers.d/lid-awake` to add it. The app detects a missing rule and presents the user-specific line in a dialog with a copy button.
-
-Notarization is deferred until the Apple Developer Program fee is paid.
+See the repository [README](../README.md) for installation, the restricted sudoers rule, migration behavior, and uninstall steps.
