@@ -42,7 +42,25 @@ Both safety limits are on out of the box and adjustable from the menu:
 
 ## Install
 
-1. Install [SwiftBar](https://swiftbar.app) and pick a plugin folder.
+lid-awake needs [SwiftBar](https://swiftbar.app) for its menu: `brew install --cask swiftbar`, launch it once, pick a plugin folder.
+
+### Homebrew
+
+```
+brew install nempyxaa/tap/lid-awake
+lid-awake-setup
+```
+
+The setup command copies the runtime files into `~/.lid-awake`, installs the SwiftBar plugin, and loads the background guard. It prints the one remaining manual step: allow passwordless `pmset` via `sudo visudo -f /etc/sudoers.d/lid-awake` with the line
+`yourusername ALL=(root) NOPASSWD: /usr/bin/pmset`
+
+### Installer package
+
+Download `lid-awake-1.0.0.pkg` from the [latest release](https://github.com/nempyxaa/lid-awake/releases/latest) and double-click it. It does everything, including the sudoers rule (written for the `%admin` group and validated with `visudo -c`), so there is no manual step. The package is unsigned until notarization lands: on first open, right-click the .pkg and choose Open.
+
+### Manual
+
+1. Clone this repo.
 2. `./install.sh`
 3. One manual step (the installer prints it): allow passwordless `pmset` via `sudo visudo -f /etc/sudoers.d/lid-awake` with the line
    `yourusername ALL=(root) NOPASSWD: /usr/bin/pmset`
