@@ -601,9 +601,18 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     // MARK: Single instance & persistent services
 
-    // One instance owns the state. A running v2 (lid-awake.app) is retired so
-    // the v3 upgrade can proceed; a running v3 peer wins over this instance.
+    // One instance owns the state. A running v2 is retired so the v3 upgrade
+    // can proceed; a running v3 peer wins over this instance.
     private func resolveSingleInstance() -> Bool {
+        // v2's bundle id is com.nempyxaa.lid-awake — enumerating only the
+        // current id can never see it, and a surviving v2 keeps writing its
+        // own pmset policy against ours. Terminate it BEFORE the migration
+        // deletes its bundle out from under it.
+        for old in NSRunningApplication.runningApplications(withBundleIdentifier: "com.nempyxaa.lid-awake")
+        where !old.isTerminated {
+            old.forceTerminate()
+            appendLog("terminated running v2 instance (com.nempyxaa.lid-awake) for migration")
+        }
         let peers = NSRunningApplication
             .runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "app.lidawake")
             .filter { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier && !$0.isTerminated }

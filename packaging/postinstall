@@ -14,7 +14,10 @@ run() {
   if [ "$DRY" = 1 ]; then echo "[dry-run] $*"; else "$@"; fi
 }
 
-# 1. The old v2 bundle must not survive next to the renamed one.
+# 1. The old v2 bundle must not survive next to the renamed one — and a
+# RUNNING v2 must die first, or it keeps fighting the new app over pmset
+# from a deleted bundle. pkill exits 1 when nothing matched; that is fine.
+run pkill -f '/Applications/lid-awake.app/Contents/MacOS/' || true
 if [ -d "$D/Applications/lid-awake.app" ]; then
   run rm -rf "$D/Applications/lid-awake.app"
 fi
