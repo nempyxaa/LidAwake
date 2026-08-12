@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LidAwake v3 — Exit Signs rev 2 mockups</title>
+<style>
+body{margin:0;padding:24px;background:#ececef;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#1d1d1f}
+h1{font-size:18px;font-weight:600;margin:0 0 4px}
+p.note{font-size:13px;color:#6e6e73;margin:0 0 20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px;max-width:1100px}
+.lbl{font-size:12.5px;color:#6e6e73;margin:0 0 6px 2px;font-weight:600}
+.mnu{background:#1d1d1f;border:1px solid rgba(0,0,0,.35);border-radius:10px;padding:5px 0;color:#f2f2f4;font-size:13px;line-height:1.35;box-shadow:0 8px 24px rgba(0,0,0,.25);width:300px}
+.mi{padding:4px 12px 4px 32px;position:relative}
+.ck{position:absolute;left:11px;top:4px;width:16px;text-align:center}
+.sub{color:#98989d;font-size:11.5px;margin-top:1px}
+.hd{color:#9a9aa0}
+.dis{color:#77777c}
+.dis .sub{color:#68686d}
+.sep{height:1px;background:rgba(255,255,255,.14);margin:5px 12px}
+.chev{float:right;color:#98989d}
+.lt{background:#f5f5f7;border-color:rgba(0,0,0,.18);color:#1d1d1f;box-shadow:0 8px 24px rgba(0,0,0,.12)}
+.lt .sub{color:#74747a}
+.lt .hd{color:#87878d}
+.lt .dis{color:#a2a2a8}
+.lt .sep{background:rgba(0,0,0,.14)}
+.lt .chev{color:#74747a}
+</style>
+</head>
+<body>
+<h1>LidAwake v3 — Exit Signs, revision 2</h1>
+<p class="note">Your edits applied: no "This once —", "Change mode in Settings" hint, "When turned on:" radios with the lid clause reordered, bare Always label, "On power:". Panels 2 and 6 show the light appearance — native NSMenu, zero extra code.</p>
+<div class="grid">
+
+<div><p class="lbl">1 · Main menu, idle — dark</p>
+<div class="mnu">
+<div class="mi hd"><span class="ck">☾</span>Lid closed: sleeps</div>
+<div class="mi hd">Battery: 40%</div>
+<div class="sep"></div>
+<div class="mi"><span class="ck">☕</span>Keep awake with lid closed<div class="sub">Until lid opens, 20%, or hot</div><div class="sub">Change mode in Settings</div></div>
+<div class="mi"><span class="ck">ᶻᶻ</span>Sleep now</div>
+<div class="sep"></div>
+<div class="mi"><span class="ck">⚙</span>Settings<span class="chev">›</span></div>
+</div></div>
+
+<div><p class="lbl">2 · Same menu — light appearance</p>
+<div class="mnu lt">
+<div class="mi hd"><span class="ck">☾</span>Lid closed: sleeps</div>
+<div class="mi hd">Battery: 40%</div>
+<div class="sep"></div>
+<div class="mi"><span class="ck">☕</span>Keep awake with lid closed<div class="sub">Until lid opens, 20%, or hot</div><div class="sub">Change mode in Settings</div></div>
+<div class="mi"><span class="ck">ᶻᶻ</span>Sleep now</div>
+<div class="sep"></div>
+<div class="mi"><span class="ck">⚙</span>Settings<span class="chev">›</span></div>
+</div></div>
+
+<div><p class="lbl">2a · One-shot armed — unified "Keep awake" header</p>
+<div class="mnu">
+<div class="mi hd"><span class="ck">☕</span>Lid closed: Keep awake</div>
+<div class="mi hd">Until: lid opens, 20%, or hot</div>
+<div class="mi hd">Battery: 40%</div>
+<div class="sep"></div>
+<div class="mi"><span class="ck">☾</span>Turn off Keep awake</div>
+<div class="mi"><span class="ck">ᶻᶻ</span>Sleep now<div class="sub">Sleeps and turns Keep awake off</div></div>
+<div class="sep"></div>
+<div class="mi"><span class="ck">⚙</span>Settings<span class="chev">›</span></div>
+</div></div>
+
+<div><p class="lbl">3 · Settings — the three modes, no ask option</p>
+<div class="mnu">
+<div class="mi"><span class="ck">✓</span>Show notifications</div>
+<div class="mi"><span class="ck">▤</span>Battery floor: 20%<span class="chev">›</span></div>
+<div class="sep"></div>
+<div class="mi hd">On battery, Keep awake</div>
+<div class="mi"><span class="ck">✓</span>When turned on: until lid opens, 20%, or hot</div>
+<div class="mi">When turned on: ignoring lid, until 20% or hot</div>
+<div class="mi">Always when on battery: until 20% or hot</div>
+<div class="sep"></div>
+<div class="mi">Quit LidAwake</div>
+</div></div>
+
+<div><p class="lbl">4 · Always selected — main menu inverts, no arm click needed</p>
+<div class="mnu">
+<div class="mi hd"><span class="ck">☕</span>Lid closed: every time Keep awake</div>
+<div class="mi hd">Until 20% or hot, always</div>
+<div class="mi hd">Battery: 40%</div>
+<div class="sep"></div>
+<div class="mi"><span class="ck">☾</span>Sleep on next lid close<div class="sub">Always Keep awake stays on</div></div>
+<div class="mi">Turn off Always Keep awake<div class="sub">Keep awake only when you click it</div></div>
+<div class="mi"><span class="ck">ᶻᶻ</span>Sleep now</div>
+<div class="sep"></div>
+<div class="mi"><span class="ck">⚙</span>Settings<span class="chev">›</span></div>
+</div></div>
+
+<div><p class="lbl">5 · Plugged in while a one-shot was armed</p>
+<div class="mnu">
+<div class="mi hd"><span class="ck">⚡</span>On power: Keep awake resumes on battery</div>
+<div class="mi hd">Until: lid opens, 20%, or hot</div>
+<div class="mi hd">Battery: 78%, charging</div>
+<div class="sep"></div>
+<div class="mi"><span class="ck">☾</span>Turn off Keep awake</div>
+<div class="mi"><span class="ck">ᶻᶻ</span>Sleep now</div>
+<div class="sep"></div>
+<div class="mi"><span class="ck">⚙</span>Settings<span class="chev">›</span></div>
+</div></div>
+
+<div><p class="lbl">6 · Plugged in, nothing armed — on power the app keeps awake automatically (light)</p>
+<div class="mnu lt">
+<div class="mi hd"><span class="ck">☕</span>Lid closed: Keep awake (on power)</div>
+<div class="mi hd">Battery: 78%, charging</div>
+<div class="sep"></div>
+<div class="mi dis"><span class="ck">☕</span>Keep awake with lid closed<div class="sub">On power: Keep awake automatically</div></div>
+<div class="mi"><span class="ck">ᶻᶻ</span>Sleep now</div>
+<div class="sep"></div>
+<div class="mi"><span class="ck">⚙</span>Settings<span class="chev">›</span></div>
+</div></div>
+
+</div>
+</body>
+</html>

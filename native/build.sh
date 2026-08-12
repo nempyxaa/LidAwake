@@ -1,33 +1,35 @@
 #!/bin/bash
+# Builds the universal, ad-hoc signed LidAwake.app and runs the tests.
+# No spaces in any filename: the bundle is LidAwake.app, and Finder shows
+# "LidAwake" via CFBundleDisplayName.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 NATIVE="$ROOT/native"
 OUT="$NATIVE/build"
-APP="$OUT/lid-awake.app"
-SDK="$(xcrun --sdk macosx --show-sdk-path)"
+APP="$OUT/LidAwake.app"
 
-rm -rf "$APP" "$OUT/arm64" "$OUT/x86_64"
-mkdir -p "$APP/Contents/MacOS" "$OUT/arm64" "$OUT/x86_64"
-cp "$NATIVE/Info.plist" "$APP/Contents/Info.plist"
-
-SOURCES=("$NATIVE/Sources/StateMachine.swift" "$NATIVE/Sources/LidAwakeApp.swift")
-FRAMEWORKS=(-framework AppKit -framework UserNotifications -framework ServiceManagement)
-for ARCH in arm64 x86_64; do
-  xcrun swiftc -parse-as-library -O -target "$ARCH-apple-macosx13.0" -sdk "$SDK" \
-    -module-cache-path "$OUT/$ARCH/module-cache" \
-    "${SOURCES[@]}" "${FRAMEWORKS[@]}" -o "$OUT/$ARCH/lid-awake"
+cd "$NATIVE"
+swift test
+# Per-arch builds + lipo: works with the Command Line Tools alone
+# (the combined --arch invocation needs full Xcode's xcbuild).
+for TRIPLE in arm64-apple-macosx14.4 x86_64-apple-macosx14.4; do
+  swift build -c release --triple "$TRIPLE"
 done
-xcrun lipo -create "$OUT/arm64/lid-awake" "$OUT/x86_64/lid-awake" -output "$APP/Contents/MacOS/lid-awake"
+BIN_ARM="$(swift build -c release --triple arm64-apple-macosx14.4 --show-bin-path)/LidAwake"
+BIN_X86="$(swift build -c release --triple x86_64-apple-macosx14.4 --show-bin-path)/LidAwake"
+
+rm -rf "$APP" "$OUT/lid-awake.app"
+mkdir -p "$APP/Contents/MacOS"
+cp "$NATIVE/Info.plist" "$APP/Contents/Info.plist"
+xcrun lipo -create "$BIN_ARM" "$BIN_X86" -output "$APP/Contents/MacOS/LidAwake"
+
 codesign --force --deep --sign - "$APP"
 plutil -lint "$APP/Contents/Info.plist"
 codesign --verify --deep --strict "$APP"
-ARCHS="$(xcrun lipo -archs "$APP/Contents/MacOS/lid-awake" | tr ' ' '\n' | sort | xargs)"
+ARCHS="$(xcrun lipo -archs "$APP/Contents/MacOS/LidAwake" | tr ' ' '\n' | sort | xargs)"
 if [[ "$ARCHS" != "arm64 x86_64" ]]; then
   echo "unexpected executable architectures: $ARCHS" >&2
   exit 1
 fi
 echo "$ARCHS"
-
-swiftc -module-cache-path "$OUT/test-module-cache" \
-  "$NATIVE/Sources/StateMachine.swift" "$NATIVE/Tests/StateMachineTests.swift" -o "$OUT/state-machine-tests"
-"$OUT/state-machine-tests"
+echo "Built $APP"
