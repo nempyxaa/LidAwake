@@ -436,26 +436,131 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         _ = Shell.run("/bin/launchctl", ["bootout", "gui/\(getuid())/com.nempyxaa.lid-awake.guard"])
         if removeFile { try? FileManager.default.removeItem(at: guardPlistURL) }
     }
-    private func migrateLegacyInstall() {
-        guard !UserDefaults.standard.bool(forKey: "nativeMigrationCompleted") else { return }
-        let fm = FileManager.default, home = fm.homeDirectoryForCurrentUser
-        let oldPlist = home.appendingPathComponent("Library/LaunchAgents/org.lidawake.guard.plist")
-        var removed = false
-        if fm.fileExists(atPath: oldPlist.path) {
-            _ = Shell.run("/bin/launchctl", ["bootout", "gui/\(getuid())", oldPlist.path])
-            try? fm.removeItem(at: oldPlist); removed = true
-        }
-        let pluginDirectory = Shell.run("/usr/bin/defaults", ["read", "com.ameba.SwiftBar", "PluginDirectory"]).1
+    // v1 migration. Runs on every launch and works by enumeration, never by
+    // expected names alone: the 2026-08 incident left lv.fleet.lidguard and
+    // lid.10s.sh running in parallel with v2 because the old code only looked
+    // for the names it had installed itself.
+    private var legacyAgentNames: Set<String> { ["org.lidawake.guard.plist", "lv.fleet.lidguard.plist"] }
+    private var legacyPluginNames: Set<String> { ["lidawake.10s.sh", "lid.10s.sh"] }
+    private var legacyScriptNames: [String] { ["lid-battery-guard.sh", "lid-toggle.sh", "lid-settings.sh", "lidawake.10s.sh", "thermalstate"] }
+    // Tokens that only ever appear in v1 launchd labels; v2's own labels
+    // ("com.nempyxaa.lid-awake.guard", "application.com.nempyxaa.lid-awake.*")
+    // must not match, and neither may bystanders like com.apple.ATS.FontValidator.
+    private var legacyLaunchdTokens: [String] { ["lidawake", "lidguard", "lid-guard", "lv.fleet.lid"] }
+
+    private func listDirectory(_ dir: URL) -> [URL] {
+        (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+    }
+    private func isLegacyAgentPlist(_ url: URL) -> Bool {
+        guard url.pathExtension == "plist", url.lastPathComponent != guardPlistURL.lastPathComponent else { return false }
+        if legacyAgentNames.contains(url.lastPathComponent) { return true }
+        guard let content = try? String(contentsOf: url, encoding: .utf8) else { return false }
+        return content.contains("lid-battery-guard") || content.contains("lidawake") || content.contains(".lid-awake/")
+    }
+    // Content match keys on the v1 action scripts, not on ".lid-awake": a
+    // user-authored plugin that merely displays lid-awake state must survive.
+    private func isLegacyPlugin(_ url: URL) -> Bool {
+        if legacyPluginNames.contains(url.lastPathComponent) { return true }
+        guard url.pathExtension == "sh", let content = try? String(contentsOf: url, encoding: .utf8) else { return false }
+        return content.contains("lid-toggle") || content.contains("lid-battery-guard")
+    }
+    private func swiftBarPluginDirectories() -> [URL] {
+        let fm = FileManager.default
+        var dirs: [URL] = []
+        let configured = Shell.run("/usr/bin/defaults", ["read", "com.ameba.SwiftBar", "PluginDirectory"]).1
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        if !pluginDirectory.isEmpty {
-            let plugin = URL(fileURLWithPath: pluginDirectory).appendingPathComponent("lidawake.10s.sh")
-            if fm.fileExists(atPath: plugin.path) { try? fm.removeItem(at: plugin); removed = true }
+        if !configured.isEmpty { dirs.append(URL(fileURLWithPath: (configured as NSString).expandingTildeInPath)) }
+        let legacy = fm.homeDirectoryForCurrentUser.appendingPathComponent(".claude/swiftbar-plugins")
+        if !dirs.contains(where: { $0.standardizedFileURL.path == legacy.standardizedFileURL.path }) { dirs.append(legacy) }
+        return dirs.filter { fm.fileExists(atPath: $0.path) }
+    }
+    private func backUp(_ url: URL, to dir: URL) {
+        let fm = FileManager.default
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        var destination = dir.appendingPathComponent(url.lastPathComponent)
+        var counter = 2
+        while fm.fileExists(atPath: destination.path) {
+            destination = dir.appendingPathComponent("\(url.lastPathComponent).\(counter)"); counter += 1
         }
-        UserDefaults.standard.set(true, forKey: "nativeMigrationCompleted")
-        if removed {
+        try? fm.copyItem(at: url, to: destination)
+    }
+    private func removeLegacyFile(_ url: URL, backupDir: URL, removed: inout [String]) {
+        backUp(url, to: backupDir)
+        try? FileManager.default.removeItem(at: url)
+        if !FileManager.default.fileExists(atPath: url.path) { removed.append(url.path) }
+    }
+
+    private func migrateLegacyInstall() {
+        let fm = FileManager.default, home = fm.homeDirectoryForCurrentUser
+        let stampFormatter = DateFormatter(); stampFormatter.dateFormat = "yyyyMMdd-HHmmss"
+        let backupDir = home.appendingPathComponent(".lid-awake/backups/v1-migration-\(stampFormatter.string(from: Date()))")
+        var removed: [String] = []
+
+        // 1. LaunchAgents: enumerate the directory, bootout by label and by
+        // path, back up, remove — and take the guard script each agent ran.
+        for plist in listDirectory(home.appendingPathComponent("Library/LaunchAgents")) where isLegacyAgentPlist(plist) {
+            let dict = (try? Data(contentsOf: plist))
+                .flatMap { try? PropertyListSerialization.propertyList(from: $0, options: [], format: nil) } as? [String: Any]
+            let label = dict?["Label"] as? String ?? plist.deletingPathExtension().lastPathComponent
+            _ = Shell.run("/bin/launchctl", ["bootout", "gui/\(getuid())/\(label)"])
+            _ = Shell.run("/bin/launchctl", ["bootout", "gui/\(getuid())", plist.path])
+            removeLegacyFile(plist, backupDir: backupDir, removed: &removed)
+            for argument in dict?["ProgramArguments"] as? [String] ?? [] where argument.contains("lid-battery-guard") {
+                let script = URL(fileURLWithPath: argument)
+                if fm.fileExists(atPath: script.path) { removeLegacyFile(script, backupDir: backupDir, removed: &removed) }
+            }
+        }
+
+        // 2. SwiftBar plugins: enumerate the configured plugin directory and
+        // the known legacy one; match by exact name or plugin content.
+        for dir in swiftBarPluginDirectories() {
+            for plugin in listDirectory(dir) where isLegacyPlugin(plugin) {
+                removeLegacyFile(plugin, backupDir: backupDir, removed: &removed)
+            }
+        }
+
+        // 3. Known v1 script locations that nothing enumerable points at anymore.
+        for dir in [home.appendingPathComponent(".claude/hooks"), home.appendingPathComponent(".lid-awake")] {
+            for name in legacyScriptNames {
+                let file = dir.appendingPathComponent(name)
+                if fm.fileExists(atPath: file.path) { removeLegacyFile(file, backupDir: backupDir, removed: &removed) }
+            }
+        }
+
+        // 4. A guard mid-run survives its agent's bootout; kill it.
+        _ = Shell.run("/usr/bin/pkill", ["-f", "lid-battery-guard"])
+
+        for path in removed { appendLog("migration removed \(path) (backup: \(backupDir.path))") }
+        for remnant in legacyRemnants() { appendLog("migration VERIFY FAILED: \(remnant)") }
+        if !removed.isEmpty {
             let c = UIStrings.current, alert = NSAlert(); alert.messageText = c.migrationTitle; alert.informativeText = c.migrationBody
             alert.addButton(withTitle: c.ok); alert.runModal()
         }
+    }
+
+    // Post-migration verification by enumeration of live state, not expected
+    // names: loaded launchd jobs, LaunchAgent plists, every SwiftBar plugin
+    // directory, and running processes. Failures are logged and the sweep
+    // retries on the next launch.
+    private func legacyRemnants() -> [String] {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        var remnants: [String] = []
+        let jobs = Shell.run("/bin/launchctl", ["list"]).1.lowercased()
+        for token in legacyLaunchdTokens where jobs.contains(token) {
+            remnants.append("launchctl list still shows a job matching '\(token)'")
+        }
+        for plist in listDirectory(home.appendingPathComponent("Library/LaunchAgents")) where isLegacyAgentPlist(plist) {
+            remnants.append("LaunchAgent remains: \(plist.path)")
+        }
+        for dir in swiftBarPluginDirectories() {
+            for plugin in listDirectory(dir) where isLegacyPlugin(plugin) {
+                remnants.append("SwiftBar plugin remains: \(plugin.path)")
+            }
+        }
+        if Shell.run("/usr/bin/pgrep", ["-f", "lid-battery-guard"]).0 == 0 {
+            remnants.append("a legacy guard process is still running")
+        }
+        return remnants
     }
 }
 

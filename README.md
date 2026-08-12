@@ -21,7 +21,7 @@ The build produces `native/build/lid-awake.app`, compiles and asserts both `arm6
 
 lid-awake refuses to register its login item or safety agent when run from a build or download directory. On first launch from `/Applications`, it installs a small per-user LaunchAgent. Every 60 seconds that agent runs the same binary with `--guard-tick`, so safety cleanup does not depend on the menu app staying alive.
 
-The first native launch also unloads and removes the old `org.lidawake.guard` LaunchAgent and removes `lidawake.10s.sh` from SwiftBar's configured plugin directory. It shows a notice if it finds either legacy file. Only one native menu app can run at a time.
+Every native launch also sweeps for v1 remnants by enumeration, not by expected names. It enumerates `~/Library/LaunchAgents` and unloads (`launchctl bootout`) and removes any lid-awake guard agent it finds — including `org.lidawake.guard` and `lv.fleet.lidguard` — along with the guard script each agent ran. It enumerates SwiftBar's configured plugin directory (and the legacy `~/.claude/swiftbar-plugins`) and removes lid plugins such as `lidawake.10s.sh` or `lid.10s.sh`, removes known v1 scripts from `~/.claude/hooks` and `~/.lid-awake`, and kills stray guard processes. Every removed file is first backed up under `~/.lid-awake/backups/`. The sweep then verifies by enumerating live state — `launchctl list`, the LaunchAgents directory, the plugin directories, and `pgrep` must show no v1 remnants — and logs any failure to `~/.lid-awake/state/lid-guard.log`; because the sweep runs on every launch, a failed verification retries next time. A notice is shown when legacy files were removed. Only one native menu app can run at a time.
 
 ## Permission
 
