@@ -1,8 +1,8 @@
 #!/bin/bash
-# Builds the unsigned Lid Awake installer package into the repo root.
+# Builds the unsigned LidAwake installer package into the repo root.
 # Usage: packaging/build-pkg.sh [version]
-# Payload: /Applications/LidAwake.app (no spaces in any filename; Finder
-# shows "Lid Awake" via CFBundleDisplayName).
+# Payload: /Applications/LidAwake.app — "LidAwake" everywhere, no spaces in
+# any filename; lowercase identifiers use "lidawake" with no hyphen.
 set -e
 cd "$(dirname "$0")/.."
 VERSION="${1:-3.0.0}"
@@ -19,7 +19,7 @@ cp packaging/postinstall "$BUILD/scripts/postinstall"
 chmod 755 "$BUILD/scripts/postinstall"
 
 pkgbuild --root "$BUILD/root" --scripts "$BUILD/scripts" \
-  --identifier com.nempyxaa.lid-awake.pkg --version "$VERSION" \
-  --install-location / "$BUILD/lid-awake-component.pkg"
-productbuild --package "$BUILD/lid-awake-component.pkg" "lid-awake-$VERSION.pkg"
-echo "Built lid-awake-$VERSION.pkg"
+  --identifier app.lidawake.pkg --version "$VERSION" \
+  --install-location / "$BUILD/lidawake-component.pkg"
+productbuild --package "$BUILD/lidawake-component.pkg" "lidawake-$VERSION.pkg"
+echo "Built lidawake-$VERSION.pkg"

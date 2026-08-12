@@ -155,6 +155,36 @@ private extension Decision {
         #expect(d.postmortems == [.hot])
     }
 
+    @Test func hotOnACLidOpenEndsHeldOneShotWithoutSleep() {
+        // Heat ends Keep awake in every mode — on AC with the lid open too.
+        let d = StateMachine.tick(snap(power: .ac, lid: .open, thermal: 2,
+                                       disabled: true, oneShot: true, hold: 60))
+        #expect(d.endsOneShot)
+        #expect(d.restoresDefault)
+        #expect(d.postmortems == [.hot])
+        #expect(d.effects.contains(.setACHold(false)))
+        #expect(!d.sleeps, "never sleep an open, in-use Mac — on AC either")
+        #expect(!d.terminal)
+    }
+
+    @Test func hotOnACLidClosedStandingKeepAwakeDropsAndSleeps() {
+        // No one-shot: the automatic on-power Keep awake must not hold
+        // SleepDisabled on a hot, closed-lid Mac on the charger.
+        let d = StateMachine.tick(snap(power: .ac, lid: .closed, thermal: 2, disabled: true))
+        #expect(d.restoresDefault)
+        #expect(d.sleeps)
+        #expect(d.terminal)
+        #expect(d.effects.contains(.thermalHistory))
+    }
+
+    @Test func hotOnACLidOpenStandingKeepAwakeSuspendsWithoutSleep() {
+        let d = StateMachine.tick(snap(power: .ac, lid: .open, thermal: 2, disabled: true))
+        #expect(d.restoresDefault)
+        #expect(!d.sleeps)
+        let idle = StateMachine.tick(snap(power: .ac, lid: .open, thermal: 2, disabled: false))
+        #expect(!idle.enables, "no automatic re-enable while hot")
+    }
+
     @Test func acAutoKeepAwake() {
         let d = StateMachine.tick(snap(power: .ac))
         #expect(d.enables)
@@ -294,11 +324,16 @@ private extension Decision {
         #expect(ready.effects.contains(.notify(.alwaysResumed)))
     }
 
-    @Test func armGateUsesTheSamePredicate() {
-        #expect(!StateMachine.arm(snap(battery: 24)).enables)
-        #expect(StateMachine.arm(snap(battery: 25)).enables)
-        #expect(!StateMachine.arm(snap(battery: 80, thermalOK: 100)).enables,
-                "arming while cooling down is refused")
+    @Test func armGateIsFloorAndHotOnly() {
+        // Spec: arming is disabled only at/below the floor or while hot; the
+        // resume predicate (floor + 5, five calm minutes) gates resumption.
+        #expect(StateMachine.arm(snap(battery: 22)).enables,
+                "between floor and floor + 5 arming is allowed")
+        #expect(!StateMachine.arm(snap(battery: 20)).enables, "at the floor")
+        #expect(!StateMachine.arm(snap(battery: nil)).enables, "unreadable battery counts as hit")
+        #expect(!StateMachine.arm(snap(battery: 80, thermal: 2)).enables, "while hot")
+        #expect(StateMachine.arm(snap(battery: 80, thermalOK: 100)).enables,
+                "a recent thermal blip does not block arming once cooled")
     }
 }
 
@@ -341,6 +376,25 @@ private extension Decision {
         #expect(willSleepOpen.effects.isEmpty)
         let willSleepClosed = StateMachine.systemWillSleep(snap(lid: .closed, mode: .always, skip: true))
         #expect(willSleepClosed.effects.contains(.setSkipOnce(false)))
+    }
+
+    @Test func toggleSkipOncePmsetAppliesImmediately() {
+        // A lid close within the next minute must honor the promise; the
+        // pmset change cannot wait for the reconciling tick.
+        let arm = StateMachine.toggleSkipOnce(snap(disabled: true, mode: .always))
+        #expect(arm.restoresDefault)
+        #expect(arm.effects.contains(.setSkipOnce(true)))
+        let cancel = StateMachine.toggleSkipOnce(snap(disabled: false, mode: .always, skip: true))
+        #expect(cancel.enables)
+        #expect(cancel.effects.contains(.setSkipOnce(false)))
+    }
+
+    @Test func unplugHonorsArmedSkipOnce() {
+        let d = StateMachine.tick(snap(power: .battery, prevPower: .ac, battery: 60,
+                                       disabled: true, mode: .always, skip: true))
+        #expect(d.restoresDefault, "the promised one-time sleep survives the unplug")
+        #expect(!d.enables)
+        #expect(!d.effects.contains(.setSkipOnce(false)))
     }
 
     @Test func skipOnceClearedByPolicyChange() {
@@ -412,6 +466,20 @@ private extension Decision {
                 "a failed pmset write must abort before policy is cleared")
     }
 
+    @Test func edgeTransitionsRetryFromThePostFailureSnapshot() {
+        // The app layer keeps priorLid/priorPower when a verified pmset write
+        // fails, so the next tick sees the identical snapshot and must
+        // re-produce the identical end decision (tick is pure and stable).
+        let s = snap(lid: .open, prevLid: .closed, disabled: true,
+                     mode: .untilLidFloorHot, oneShot: true)
+        let first = StateMachine.tick(s)
+        let retry = StateMachine.tick(s)
+        #expect(first == retry)
+        #expect(retry.endsOneShot)
+        #expect(retry.restoresDefault)
+        #expect(retry.effects.contains(.notify(.lidEnd)))
+    }
+
     @Test func quitCleanupRevertsFirstAndConfirmGate() {
         let d = StateMachine.quitCleanup()
         #expect(d.effects.first == .setSleepDisabled(false, verify: true))
@@ -435,9 +503,12 @@ private extension Decision {
 
 @Suite struct StringRuleTests {
     @Test func bannedTermsNeverAppear() {
+        // Spec ban list: the retired spaced and hyphenated name forms, the
+        // sunset working title, and the banned feature terms.
         for floor in [10, 15, 20, 25, 30] {
             for s in V3Strings.allStrings(floor: floor) {
-                for banned in ["keep-awake", "staying awake", "night mode", "Night mode", "Keep Awake"] {
+                for banned in ["keep-awake", "staying awake", "night mode", "Night mode", "Keep Awake",
+                               "Lid Awake", "lid awake", "lid-awake", "lid-governor"] {
                     #expect(!s.contains(banned), "'\(banned)' in: \(s)")
                 }
             }
@@ -475,7 +546,9 @@ private extension Decision {
         #expect(V3Strings.modeRadioUntilLid(20) == "When turned on: until lid opens, 20%, or hot")
         #expect(V3Strings.modeRadioIgnoringLid(20) == "When turned on: ignoring lid, until 20% or hot")
         #expect(V3Strings.modeRadioAlways(20) == "Always when on battery: until 20% or hot")
-        #expect(V3Strings.quit == "Quit Lid Awake")
+        #expect(V3Strings.appName == "LidAwake")
+        #expect(V3Strings.about == "About LidAwake")
+        #expect(V3Strings.quit == "Quit LidAwake")
         #expect(V3Strings.quitConfirm == "Quitting turns off Keep awake; next lid close sleeps.")
         #expect(V3Strings.notifyACOn ==
                 "On power: keeping the Mac awake automatically. Click the moon to turn off.")

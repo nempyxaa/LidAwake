@@ -1,7 +1,7 @@
 #!/bin/bash
 # Builds the universal, ad-hoc signed LidAwake.app and runs the tests.
-# No spaces in any filename: the bundle is LidAwake.app; Finder shows
-# "Lid Awake" via CFBundleDisplayName.
+# No spaces in any filename: the bundle is LidAwake.app, and Finder shows
+# "LidAwake" via CFBundleDisplayName.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 NATIVE="$ROOT/native"

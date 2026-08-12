@@ -1,5 +1,5 @@
 #!/bin/bash
-# Lid Awake pkg postinstall. Runs as root after LidAwake.app lands in
+# LidAwake pkg postinstall. Runs as root after LidAwake.app lands in
 # /Applications. Installs the restricted sudoers rule and deletes the old
 # v2 bundle (lid-awake.app is a different APFS entry from LidAwake.app).
 # The app itself sweeps v1 remnants by enumeration on every launch.
@@ -21,7 +21,11 @@ fi
 
 # 2. Passwordless pmset for every admin user, restricted to the five
 # command forms the app uses. Validate before installing; never break sudo.
-SUDOERS="$D/etc/sudoers.d/lid-awake"
+# The retired hyphenated sudoers file from earlier installs goes away.
+if [ -f "$D/etc/sudoers.d/lid-awake" ]; then
+  run rm -f "$D/etc/sudoers.d/lid-awake"
+fi
+SUDOERS="$D/etc/sudoers.d/lidawake"
 TMP="$(mktemp)"
 echo "%admin ALL=(root) NOPASSWD: /usr/bin/pmset -a disablesleep 0, /usr/bin/pmset -a disablesleep 1, /usr/bin/pmset -b lowpowermode 0, /usr/bin/pmset -b lowpowermode 1, /usr/bin/pmset sleepnow" > "$TMP"
 if visudo -cf "$TMP" >/dev/null 2>&1; then

@@ -5,7 +5,7 @@ import Foundation
 // Percentages render live from the Battery floor setting.
 
 public enum V3Strings {
-    public static let appName = "Lid Awake"
+    public static let appName = "LidAwake"
 
     // MARK: Headers (disabled lines; the battery line is always last)
     public static let idleHeader = "Lid closed: sleeps"
@@ -49,7 +49,7 @@ public enum V3Strings {
     public static let armSubChangeMode = "Change mode in Settings"
     public static let armSubOnPower = "On power: Keep awake automatically"
     public static func armDisabledLow(_ floor: Int) -> String {
-        "Battery below \(floor + StateMachine.resumeMargin)%"
+        "Battery below \(floor)%"
     }
     public static let armDisabledHot = "Cooling down"
     public static let turnOff = "Turn off Keep awake"
@@ -79,7 +79,8 @@ public enum V3Strings {
     public static func modeRadioAlways(_ floor: Int) -> String {
         "Always when on battery: until \(floor)% or hot"
     }
-    public static let quit = "Quit Lid Awake"
+    public static let about = "About LidAwake"
+    public static let quit = "Quit LidAwake"
     public static let quitConfirm = "Quitting turns off Keep awake; next lid close sleeps."
 
     // MARK: Notifications
@@ -99,7 +100,7 @@ public enum V3Strings {
     public static let notifyACExpired = "Keep awake ended: 30 minutes on power."
     public static let notifyOverheatInvariant = "Overheat protection is now always on"
     public static let notifyFailure = "Could not turn on Keep awake: pmset needs the passwordless sudo rule (see README). Nothing changed."
-    public static let notifyRevertFailure = "Could not restore normal sleep. Lid Awake will retry in 60 seconds."
+    public static let notifyRevertFailure = "Could not restore normal sleep. LidAwake will retry in 60 seconds."
 
     /// Every canonical string, rendered for a given floor — used by the tests
     /// to enforce the proper-name rule mechanically.
@@ -115,7 +116,7 @@ public enum V3Strings {
          turnOffAlwaysItem, turnOffAlwaysSub, settings,
          showNotifications, floorItem(floor), floorOption(floor), floorOptionEndsCurrent(floor),
          modeSection, modeRadioUntilLid(floor), modeRadioIgnoringLid(floor), modeRadioAlways(floor),
-         quit, quitConfirm,
+         about, quit, quitConfirm,
          notifyACOn, notifyBatteryOff, notifyManualOff, notifyLidEnd,
          notifyFloorEnd(floor), notifyHotEnd, notifyFloorPaused(floor), notifyHotPaused,
          notifyAlwaysResumed, notifyACExpired, notifyOverheatInvariant,

@@ -58,8 +58,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private var postmortemDisplayed = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        migrateStateDirectory()
         guard resolveSingleInstance() else { NSApp.terminate(nil); return }
         registerDefaults()
+        migrateOldIdentifierDomain()
         migrateV2Defaults()
         status.menu = NSMenu(); status.menu?.delegate = self
         requestNotificationsIfNeeded()
@@ -76,13 +78,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
                               name: NSWorkspace.willSleepNotification, object: nil)
         workspace.addObserver(self, selector: #selector(systemDidWake),
                               name: NSWorkspace.didWakeNotification, object: nil)
-        activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated], reason: "Keep Lid Awake safety state fresh")
+        activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated], reason: "Keep LidAwake safety state fresh")
         if !hasSudoRule() { showSudoFix() }
     }
 
     func runGuardTickHeadless() {
         headless = true
+        migrateStateDirectory()
         registerDefaults()
+        migrateOldIdentifierDomain()
         migrateV2Defaults()
         reconcileBoot()
         tick(refresh: false)
@@ -93,6 +97,30 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             "notifications": true, "batteryFloor": 20,
             "batteryMode": BatteryMode.untilLidFloorHot.rawValue,
         ])
+    }
+
+    // One-time move of v2/v3 state from the retired hyphenated path. Runs
+    // before anything logs so every write lands in ~/.lidawake. If both trees
+    // exist (a partial earlier move) the old one is left for manual review.
+    private func migrateStateDirectory() {
+        let fm = FileManager.default, home = fm.homeDirectoryForCurrentUser
+        let old = home.appendingPathComponent(".lid-awake")
+        let new = home.appendingPathComponent(".lidawake")
+        guard fm.fileExists(atPath: old.path), !fm.fileExists(atPath: new.path) else { return }
+        try? fm.moveItem(at: old, to: new)
+    }
+
+    // Bundle-identifier switch (spec: app.lidawake, old ids retired): carry
+    // the stored policy over from the old defaults domain once, then delete
+    // the old domain so nothing is left under the retired identifier.
+    private func migrateOldIdentifierDomain() {
+        let d = UserDefaults.standard
+        guard !d.bool(forKey: "v3IdentifierMigrated") else { return }
+        if let old = d.persistentDomain(forName: "com.nempyxaa.lid-awake") {
+            for (key, value) in old { d.set(value, forKey: key) }
+            d.removePersistentDomain(forName: "com.nempyxaa.lid-awake")
+        }
+        d.set(true, forKey: "v3IdentifierMigrated")
     }
 
     // v2 -> v3 defaults migration: "Ask each time" is removed (its rawValue 2
@@ -147,9 +175,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     private func tick(refresh: Bool = true) {
         let s = snapshot()
-        execute(StateMachine.tick(s), snapshot: s)
-        state.priorLid = s.lid
-        state.priorPower = s.power
+        let applied = execute(StateMachine.tick(s), snapshot: s)
+        // Edge-triggered transitions (lid opened, unplugged) must re-fire
+        // after a failed pmset write: advance the edge baselines only when
+        // the whole decision applied, so the next tick retries the same edge.
+        if applied {
+            state.priorLid = s.lid
+            state.priorPower = s.power
+        }
         if let percent = s.batteryPercent { state.lastPercent = percent }
         state.lastTickAt = Date()
         if refresh { refreshMenu() }
@@ -290,8 +323,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         add(V3Strings.idleHeader, image: "moon.zzz.fill", enabled: false, to: menu)
         add(V3Strings.battery(s.batteryPercent), enabled: false, to: menu)
         menu.addItem(.separator())
-        let ready = StateMachine.resumeReady(percent: s.batteryPercent, floor: s.batteryFloor,
-                                            thermalOKSeconds: s.thermalOKSeconds)
+        // Spec: arming is disabled only at/below the floor or while hot; the
+        // resume predicate gates resumption, not arming.
+        let floorHit = StateMachine.floorHit(percent: s.batteryPercent, floor: s.batteryFloor)
+        let hot = s.thermalState >= StateMachine.seriousThermal
+        let ready = !floorHit && !hot
         let arm = add(V3Strings.armItem, image: "cup.and.saucer.fill",
                       action: ready ? #selector(armClicked) : nil, enabled: ready, to: menu)
         let contract = s.mode == .ignoringLid
@@ -301,8 +337,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             arm.subtitle = contract + "\n" + V3Strings.armSubChangeMode
         } else {
             // Disabled with the reason as the subtitle.
-            let lowBattery = (s.batteryPercent ?? 0) < s.batteryFloor + StateMachine.resumeMargin
-            arm.subtitle = lowBattery ? V3Strings.armDisabledLow(s.batteryFloor) : V3Strings.armDisabledHot
+            arm.subtitle = floorHit ? V3Strings.armDisabledLow(s.batteryFloor) : V3Strings.armDisabledHot
         }
         add(V3Strings.sleepNow, image: "zzz", action: #selector(sleepNowClicked), to: menu)
     }
@@ -337,8 +372,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     private func buildAlwaysPausedMenu(_ s: MachineSnapshot, _ menu: NSMenu) {
         add(V3Strings.idleHeader, image: "moon.zzz.fill", enabled: false, to: menu)
-        let belowResume = (s.batteryPercent ?? 0) < s.batteryFloor + StateMachine.resumeMargin
-        add(belowResume ? V3Strings.pausedFloor(s.batteryFloor) : V3Strings.pausedHot,
+        // The cooling line shows only when thermals are the actual blocker.
+        add(StateMachine.pauseBlockedByHeatOnly(s) ? V3Strings.pausedHot
+                                                   : V3Strings.pausedFloor(s.batteryFloor),
             enabled: false, to: menu)
         add(V3Strings.battery(s.batteryPercent), enabled: false, to: menu)
         menu.addItem(.separator())
@@ -413,9 +449,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             item.state = radioMode == mode ? .on : .off
         }
         submenu.addItem(.separator())
+        add(V3Strings.about, action: #selector(showAbout), to: submenu)
         add(V3Strings.quit, action: #selector(quit), to: submenu)
         settings.submenu = submenu
         return settings
+    }
+
+    @objc private func showAbout() {
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.orderFrontStandardAboutPanel(nil)
     }
 
     @discardableResult private func add(_ title: String, image: String? = nil, action: Selector? = nil,
@@ -509,7 +551,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
     private func stateDirectory() -> URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".lid-awake/state", isDirectory: true)
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".lidawake/state", isDirectory: true)
     }
     private func appendLog(_ message: String) { append("\(stamp()) \(message)\n", to: "lid-guard.log") }
     private func appendThermalHistory() { append("\(stamp()) thermal force-sleep\n", to: "thermal-history.txt") }
@@ -543,8 +585,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         guard !headless, !permissionAlertShown else { return }
         permissionAlertShown = true
         let alert = NSAlert()
-        alert.messageText = "Lid Awake needs permission to run pmset"
-        alert.informativeText = "Run: sudo visudo -f /etc/sudoers.d/lid-awake\nThen add this line:\n\(sudoersLine)"
+        alert.messageText = "LidAwake needs permission to run pmset"
+        alert.informativeText = "Run: sudo visudo -f /etc/sudoers.d/lidawake\nThen add this line:\n\(sudoersLine)"
         alert.addButton(withTitle: "Copy fix"); alert.addButton(withTitle: "OK")
         if alert.runModal() == .alertFirstButtonReturn {
             NSPasteboard.general.clearContents()
@@ -558,7 +600,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     // the v3 upgrade can proceed; a running v3 peer wins over this instance.
     private func resolveSingleInstance() -> Bool {
         let peers = NSRunningApplication
-            .runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "com.nempyxaa.lid-awake")
+            .runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "app.lidawake")
             .filter { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier && !$0.isTerminated }
         var ok = true
         for peer in peers {
@@ -576,12 +618,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         Bundle.main.bundleURL.standardizedFileURL.path.hasPrefix("/Applications/")
     }
     private var guardPlistURL: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/LaunchAgents/com.nempyxaa.lid-awake.guard.plist")
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/LaunchAgents/app.lidawake.guard.plist")
     }
     private func configurePersistentServices() {
         guard runsFromApplications else {
             let alert = NSAlert()
-            alert.messageText = "Move Lid Awake to Applications"
+            alert.messageText = "Move LidAwake to Applications"
             alert.informativeText = "The safety watchdog is enabled only from /Applications. Move the app there, then open it again."
             alert.addButton(withTitle: "OK"); alert.runModal()
             appendLog("persistent services refused outside /Applications"); return
@@ -611,7 +653,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     // The KeepAlive watchdog: launchd starts the app at login and relaunches
     // it after a crash; a clean exit (Quit, or yielding to a peer) stays down.
     private var guardPlistContent: [String: Any] {
-        ["Label": "com.nempyxaa.lid-awake.guard",
+        ["Label": "app.lidawake.guard",
          "ProgramArguments": [Bundle.main.executableURL?.path ?? ""],
          "RunAtLoad": true,
          "KeepAlive": ["SuccessfulExit": false]]
@@ -621,35 +663,41 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         if let data = try? Data(contentsOf: guardPlistURL),
            let existing = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any],
            NSDictionary(dictionary: existing).isEqual(to: desired),
-           Shell.run("/bin/launchctl", ["print", "gui/\(getuid())/com.nempyxaa.lid-awake.guard"]).0 == 0 {
+           Shell.run("/bin/launchctl", ["print", "gui/\(getuid())/app.lidawake.guard"]).0 == 0 {
             return // already installed and loaded; never bootout our own job
         }
         do {
             let data = try PropertyListSerialization.data(fromPropertyList: desired, format: .xml, options: 0)
             try FileManager.default.createDirectory(at: guardPlistURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             let domain = "gui/\(getuid())"
-            _ = Shell.run("/bin/launchctl", ["bootout", domain + "/com.nempyxaa.lid-awake.guard"])
+            _ = Shell.run("/bin/launchctl", ["bootout", domain + "/app.lidawake.guard"])
             try data.write(to: guardPlistURL, options: .atomic)
             let result = Shell.run("/bin/launchctl", ["bootstrap", domain, guardPlistURL.path])
             if result.0 != 0 { appendLog("guard LaunchAgent bootstrap failed") }
         } catch { appendLog("guard LaunchAgent install failed: \(error.localizedDescription)") }
     }
     private func unloadGuardAgent(removeFile: Bool) {
-        _ = Shell.run("/bin/launchctl", ["bootout", "gui/\(getuid())/com.nempyxaa.lid-awake.guard"])
+        _ = Shell.run("/bin/launchctl", ["bootout", "gui/\(getuid())/app.lidawake.guard"])
         if removeFile { try? FileManager.default.removeItem(at: guardPlistURL) }
     }
 
-    // v1 migration. Runs on every launch and works by enumeration, never by
-    // expected names alone: the 2026-08 incident left lv.fleet.lidguard and
-    // lid.10s.sh running in parallel with v2 because the old code only looked
-    // for the names it had installed itself.
-    private var legacyAgentNames: Set<String> { ["org.lidawake.guard.plist", "lv.fleet.lidguard.plist"] }
+    // v1/v2/old-identifier migration. Runs on every launch and works by
+    // enumeration, never by expected names alone: the 2026-08 incident left
+    // lv.fleet.lidguard and lid.10s.sh running in parallel with v2 because
+    // the old code only looked for the names it had installed itself. The
+    // bundle-id switch to app.lidawake retires com.nempyxaa.lid-awake.* too.
+    private var legacyAgentNames: Set<String> {
+        ["org.lidawake.guard.plist", "lv.fleet.lidguard.plist", "com.nempyxaa.lid-awake.guard.plist"]
+    }
     private var legacyPluginNames: Set<String> { ["lidawake.10s.sh", "lid.10s.sh"] }
     private var legacyScriptNames: [String] { ["lid-battery-guard.sh", "lid-toggle.sh", "lid-settings.sh", "lidawake.10s.sh", "thermalstate"] }
-    // Tokens that only ever appear in v1 launchd labels; v2/v3's own labels
-    // ("com.nempyxaa.lid-awake.guard", "application.com.nempyxaa.lid-awake.*")
-    // must not match, and neither may bystanders like com.apple.ATS.FontValidator.
-    private var legacyLaunchdTokens: [String] { ["lidawake", "lidguard", "lid-guard", "lv.fleet.lid"] }
+    // Tokens that appear in legacy launchd labels — v1's, and the retired
+    // com.nempyxaa.lid-awake.* labels. The remnant check first drops every
+    // line carrying the CURRENT identifier ("app.lidawake" — the guard label
+    // and the running app's application.app.lidawake.* entries), so these
+    // tokens cannot match the new agent; bystanders like
+    // com.apple.ATS.FontValidator never matched either way.
+    private var legacyLaunchdTokens: [String] { ["lidawake", "lidguard", "lid-guard", "lid-awake", "lv.fleet.lid"] }
 
     private func listDirectory(_ dir: URL) -> [URL] {
         (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
@@ -658,7 +706,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         guard url.pathExtension == "plist", url.lastPathComponent != guardPlistURL.lastPathComponent else { return false }
         if legacyAgentNames.contains(url.lastPathComponent) { return true }
         guard let content = try? String(contentsOf: url, encoding: .utf8) else { return false }
-        return content.contains("lid-battery-guard") || content.contains("lidawake") || content.contains(".lid-awake/")
+        return content.contains("lid-battery-guard") || content.contains("lidawake")
+            || content.contains(".lid-awake/") || content.contains("com.nempyxaa.lid-awake")
     }
     // Content match keys on the v1 action scripts, not on ".lid-awake": a
     // user-authored plugin that merely displays state must survive.
@@ -696,7 +745,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private func migrateLegacyInstall() {
         let fm = FileManager.default, home = fm.homeDirectoryForCurrentUser
         let stampFormatter = DateFormatter(); stampFormatter.dateFormat = "yyyyMMdd-HHmmss"
-        let backupDir = home.appendingPathComponent(".lid-awake/backups/v1-migration-\(stampFormatter.string(from: Date()))")
+        let backupDir = home.appendingPathComponent(".lidawake/backups/v1-migration-\(stampFormatter.string(from: Date()))")
         var removed: [String] = []
 
         // 1. LaunchAgents: enumerate the directory, bootout by label and by
@@ -722,8 +771,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             }
         }
 
-        // 3. Known v1 script locations that nothing enumerable points at anymore.
-        for dir in [home.appendingPathComponent(".claude/hooks"), home.appendingPathComponent(".lid-awake")] {
+        // 3. Known v1 script locations that nothing enumerable points at
+        // anymore — the moved state dir, plus the old path in case the
+        // one-time move was blocked.
+        for dir in [home.appendingPathComponent(".claude/hooks"),
+                    home.appendingPathComponent(".lidawake"),
+                    home.appendingPathComponent(".lid-awake")] {
             for name in legacyScriptNames {
                 let file = dir.appendingPathComponent(name)
                 if fm.fileExists(atPath: file.path) { removeLegacyFile(file, backupDir: backupDir, removed: &removed) }
@@ -750,7 +803,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private func legacyRemnants() -> [String] {
         let home = FileManager.default.homeDirectoryForCurrentUser
         var remnants: [String] = []
+        // Drop every line carrying the current identifier first: the new
+        // guard label and the running app's own application.app.lidawake.*
+        // entries contain "lidawake" and must not read as remnants.
         let jobs = Shell.run("/bin/launchctl", ["list"]).1.lowercased()
+            .split(separator: "\n")
+            .filter { !$0.contains("app.lidawake") }
+            .joined(separator: "\n")
         for token in legacyLaunchdTokens where jobs.contains(token) {
             remnants.append("launchctl list still shows a job matching '\(token)'")
         }

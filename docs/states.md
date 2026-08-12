@@ -1,4 +1,4 @@
-# Lid Awake v3 — states and transitions
+# LidAwake v3 — states and transitions
 
 Source of truth: the "Exit Signs" spec (2026-08-12). The state machine lives in
 `native/Sources/LidAwakeCore/StateMachine.swift`; every transition below has a
@@ -17,7 +17,7 @@ stateDiagram-v2
         state "Always, one-time sleep armed<br/>next lid close sleeps" as SkipOnce
         state "Always paused<br/>resumes at floor+5% / cooling down" as AlwaysPaused
 
-        Idle --> OneShot : click Keep awake with lid closed<br/>(enabled at ≥ floor+5% and cool)
+        Idle --> OneShot : click Keep awake with lid closed<br/>(disabled only at/below the floor or while hot)
         OneShot --> Idle : mode 1 lid opens (reset, no sleep,<br/>no postmortem)
         OneShot --> Idle : floor hit — postmortem —<br/>lid closed sleeps naturally, lid open stays on
         OneShot --> Idle : hot — postmortem — forced sleep<br/>ONLY if lid closed, lid open just disarms
@@ -48,6 +48,8 @@ stateDiagram-v2
         ACDeclined --> ACOn : click Keep awake with lid closed
         ACHold --> ACOn : 30-min expiry — postmortem, notification —<br/>EXCEPT declined + lid closed, which survives until unplug
         ACHold --> ACOn : mode 1 lid opens / Turn off Keep awake
+        ACHold --> ACOn : hot — postmortem — ends the hold,<br/>forced sleep only if lid closed
+        ACOn --> ACOn : hot — SleepDisabled drops (closed lid sleeps),<br/>automatic Keep awake returns when cool
     }
 
     Idle --> ACOn : plug in, lid open or closed<br/>(never sleeps by itself — notification)
@@ -78,13 +80,19 @@ stateDiagram-v2
 - **Safety invariant (lid-scoped):** floor and heat always END Keep awake in
   every mode, but the forced SLEEP executes only while the lid is CLOSED. Lid
   open at floor/hot = disarm + restore default pmset + notify — never sleep an
-  open, in-use Mac.
+  open, in-use Mac. On power the same rule applies to heat: it ends a held
+  one-shot (lid open or closed) and suspends the automatic on-power Keep
+  awake — SleepDisabled drops while hot and returns once thermals recover.
 - **Floor hit** = battery at or below the floor (an unreadable battery counts
   as hit). Raising the floor above the current charge while armed is a floor
   hit; the floor submenu warns (`30% — ends current Keep awake`).
 - **Resume predicate** (single place in code, hardcoded): battery ≥ floor + 5
-  AND thermals nominal for 5 continuous minutes. Gates Always resumption,
-  resumption on unplug, and one-shot arming. Recomputed on floor change.
+  AND thermals nominal for 5 continuous minutes. Gates Always resumption and
+  resumption on unplug. Recomputed on floor change.
+- **Arming a one-shot** is disabled only at/below the floor or while hot,
+  with the reason as the menu subtitle (`Battery below N%` / `Cooling down`).
+  The resume predicate does NOT gate arming — between the floor and
+  floor + 5%, or right after a thermal blip has cleared, arming is allowed.
 - **Plugging in never causes a sleep by itself.** Only heat force-sleeps
   mid-transition, and only with the lid closed.
 - **Decline is standing:** the moon click on power declines automatic Keep
@@ -97,9 +105,11 @@ stateDiagram-v2
   ends the user did not cause — floor, hot, 30-min expiry, restart. Never a
   deliberate lid open. It persists until the first menu open after the end or
   the next arm, independent of the notifications toggle.
-- **Watchdog:** a KeepAlive LaunchAgent (`com.nempyxaa.lid-awake.guard`, no
-  root daemon) starts the app at login and relaunches it after a crash; a
-  clean exit stays down. Every launch reconciles pmset to the stored policy.
+- **Watchdog:** a KeepAlive LaunchAgent (`app.lidawake.guard`, no root
+  daemon) starts the app at login and relaunches it after a crash; a clean
+  exit stays down. Every launch reconciles pmset to the stored policy and
+  removes agents, defaults, and state under the retired identifiers
+  (`com.nempyxaa.lid-awake.*`, `lv.fleet.*`, `~/.lid-awake`) by enumeration.
 
 ## Limitations (honest)
 
@@ -110,7 +120,7 @@ stateDiagram-v2
   headers, and the postmortem line are the primary channels.
 - One-shots die at reboot by design; only Always survives.
 - Clamshell mode with an external display and power is governed by macOS
-  itself; Lid Awake does not add or remove that behavior.
+  itself; LidAwake does not add or remove that behavior.
 - No per-app awareness: the app does not know what your Mac is busy doing,
   only power, lid, battery, and thermals.
 - The lid state probe reads `AppleClamshellState`; on the rare Mac where it is
@@ -119,15 +129,19 @@ stateDiagram-v2
 
 ## Naming
 
-The app is **Lid Awake** in prose; `lid-awake` appears only in code spans,
-paths, bundle identifiers, and the brew cask token. The on-disk bundle is
-`LidAwake.app` — no spaces in any filename — while Finder, Dock, and
-notifications display "Lid Awake" via `CFBundleDisplayName`. **"Keep awake"**
-(capital K, lowercase a) is the feature's proper name in every menu line,
-status header, and notification; `keep-awake`, `staying awake`, and
-`night mode` are banned everywhere. CI enforces both rules via
-`scripts/check-naming.sh`, and the state-machine tests sweep every canonical
-string for the banned terms.
+The app is **LidAwake** — CamelCase, one word — on every surface: prose,
+Finder/Dock/notifications (`CFBundleName`/`CFBundleDisplayName`), the About
+window, and the menu items ("Quit LidAwake", "About LidAwake"). Where
+lowercase is forced it is `lidawake` with no hyphen: the bundle identifier
+`app.lidawake`, the LaunchAgent label `app.lidawake.guard`, the brew cask
+token. The on-disk bundle is `LidAwake.app` — no spaces in any filename. The
+spaced and hyphenated old forms are retired; they survive only inside the
+migration code that enumerates and removes the old identifiers.
+**"Keep awake"** (capital K, lowercase a) is the feature's proper name in
+every menu line, status header, and notification; `keep-awake`,
+`staying awake`, and `night mode` are banned everywhere, as is the sunset
+working title. CI enforces all of it via `scripts/check-naming.sh`, and the
+state-machine tests sweep every canonical string for the banned forms.
 
 ## Screenshots
 

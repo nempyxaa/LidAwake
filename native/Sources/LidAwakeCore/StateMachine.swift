@@ -1,6 +1,6 @@
 import Foundation
 
-// Lid Awake v3 state machine ("Exit Signs" spec, 2026-08-12).
+// LidAwake v3 state machine ("Exit Signs" spec, 2026-08-12).
 // Pure decisions: a MachineSnapshot goes in, a Decision (ordered effects) comes
 // out. The app layer executes effects against pmset / UserDefaults / launchd.
 //
@@ -8,6 +8,8 @@ import Foundation
 // effects after, notifications and logs last. The executor aborts the rest of a
 // decision when a verified pmset write fails, so a failed write leaves the
 // stored policy intact and the reconciling tick retries the same transition.
+// The app layer advances the lid/power edge baselines only after a decision
+// fully applies, so edge-triggered transitions (lid open, unplug) retry too.
 
 public enum PowerSource: Equatable { case ac, battery }
 public enum LidState: String, Equatable { case open, closed, unknown }
@@ -130,7 +132,9 @@ public enum StateMachine {
     public static let seriousThermal = 2
 
     /// The single resume predicate (spec: one place in code). Gates Always
-    /// resumption, resumption on unplug, and one-shot arming.
+    /// resumption and resumption on unplug. One-shot arming is NOT gated on
+    /// it — arming is refused only at/below the floor or while hot (spec:
+    /// "Arming below floor / while hot: one-shots disabled with reason").
     public static func resumeReady(percent: Int?, floor: Int, thermalOKSeconds: TimeInterval) -> Bool {
         guard let percent else { return false }
         return percent >= floor + resumeMargin && thermalOKSeconds >= thermalCalmRequirement
@@ -196,6 +200,13 @@ public enum StateMachine {
                 return Decision(effects: e)
             }
             if paused { e.append(.setAlwaysPaused(false)); paused = false }
+            if skip {
+                // The promised one-time sleep is honored across the unplug:
+                // do not re-enable pmset; the next lid close sleeps.
+                if s.sleepDisabled { e.append(.setSleepDisabled(false, verify: true)) }
+                e += [.setLowPowerMode(false), .log("one-time sleep armed across unplug")]
+                return Decision(effects: e)
+            }
             if !s.sleepDisabled { e.append(.setSleepDisabled(true, verify: true)) }
             e += [.setLowPowerMode(true), .log("Always Keep awake active on battery")]
             return Decision(effects: e)
@@ -264,14 +275,19 @@ public enum StateMachine {
                 e += [.setOneShot(false), .setACHold(false), .notify(.lidEnd),
                       .log("held one-shot ended (lid opened)")]
                 oneShot = false
-            } else if hot && s.lid == .closed {
-                // The only sleep a power transition may cause: heat, lid closed.
+            } else if hot {
+                // Heat always ends Keep awake — on AC too, lid open or closed
+                // (the safety invariant holds "in every mode"). The forced
+                // sleep still runs only while the lid is closed.
                 e += [.setSleepDisabled(false, verify: true), .setLowPowerMode(false),
                       .setOneShot(false), .setACHold(false),
                       .recordPostmortem(.hot), .notify(.hotEnd), .thermalHistory,
-                      .log("thermal force-sleep on power (thermalState=\(s.thermalState))"),
-                      .sleepNow]
-                return Decision(effects: e, terminal: true)
+                      .log("thermal end on power (thermalState=\(s.thermalState))")]
+                if s.lid == .closed {
+                    e.append(.sleepNow)
+                    return Decision(effects: e, terminal: true)
+                }
+                return Decision(effects: e)
             } else if let held = s.acHoldSeconds, held >= acHoldLimit,
                       !(s.acDeclined && s.lid == .closed) {
                 // Anti-zombie expiry — except when the hold is the only thing
@@ -287,13 +303,26 @@ public enum StateMachine {
 
         if s.acDeclined {
             // Declined: the lid sleeps the Mac — unless a held one-shot must
-            // keep a closed lid awake until unplug.
+            // keep a closed-lid Mac awake until unplug.
             let mustStayAwake = oneShot && s.lid == .closed
             if s.sleepDisabled && !mustStayAwake {
                 e += [.setSleepDisabled(false, verify: true), .log("on-power Keep awake stays declined")]
             } else if !s.sleepDisabled && mustStayAwake {
                 e += [.setSleepDisabled(true, verify: true),
-                      .log("held one-shot keeps the closed lid awake (declined)")]
+                      .log("held one-shot keeps the closed-lid Mac awake (declined)")]
+            }
+        } else if hot {
+            // The standing on-power Keep awake honors heat too: drop
+            // SleepDisabled while hot (a closed lid then sleeps); the
+            // automatic behavior returns once thermals recover.
+            if s.sleepDisabled {
+                e += [.setSleepDisabled(false, verify: true),
+                      .recordPostmortem(.hot), .notify(.hotPaused), .thermalHistory,
+                      .log("on-power Keep awake suspended (thermalState=\(s.thermalState))")]
+                if s.lid == .closed {
+                    e.append(.sleepNow)
+                    return Decision(effects: e, terminal: true)
+                }
             }
         } else if !s.sleepDisabled {
             e += [.setSleepDisabled(true, verify: true), .notify(.acAutoOn),
@@ -372,8 +401,12 @@ public enum StateMachine {
             ])
         }
         guard s.mode.isOneShot, !s.oneShotActive else { return Decision() }
-        guard resumeReady(percent: s.batteryPercent, floor: s.batteryFloor, thermalOKSeconds: s.thermalOKSeconds) else {
-            return Decision(effects: [.log("arm refused (below floor + 5 or cooling down)")])
+        // Spec: arming is disabled only at/below the floor or while hot. The
+        // resume predicate (floor + 5, five calm minutes) gates resumption,
+        // not arming.
+        guard !floorHit(percent: s.batteryPercent, floor: s.batteryFloor),
+              s.thermalState < seriousThermal else {
+            return Decision(effects: [.log("arm refused (at/below floor or hot)")])
         }
         return Decision(effects: [
             .setSleepDisabled(true, verify: true), .setLowPowerMode(true),
@@ -417,11 +450,23 @@ public enum StateMachine {
         return Decision(effects: e)
     }
 
-    /// "Sleep on next lid close" / "Cancel one-time sleep".
+    /// "Sleep on next lid close" / "Cancel one-time sleep". The pmset change
+    /// applies immediately — a lid close within the next minute must honor the
+    /// promise, not wait for the reconciling tick.
     public static func toggleSkipOnce(_ s: MachineSnapshot) -> Decision {
         guard s.mode == .always else { return Decision() }
-        return Decision(effects: [.setSkipOnce(!s.skipOnce),
-                                  .log(s.skipOnce ? "one-time sleep cancelled" : "one-time sleep armed")])
+        var e: [Effect] = []
+        let arming = !s.skipOnce
+        if s.power == .battery && !s.alwaysPaused {
+            if arming && s.sleepDisabled {
+                e += [.setSleepDisabled(false, verify: true), .setLowPowerMode(false)]
+            } else if !arming && !s.sleepDisabled {
+                e += [.setSleepDisabled(true, verify: true), .setLowPowerMode(true)]
+            }
+        }
+        e += [.setSkipOnce(arming),
+              .log(arming ? "one-time sleep armed" : "one-time sleep cancelled")]
+        return Decision(effects: e)
     }
 
     /// "Sleep now". For a one-shot this also turns Keep awake off (menu
@@ -502,10 +547,15 @@ public enum StateMachine {
             (s.mode == .always && s.power == .battery && !s.alwaysPaused)
     }
 
+    /// Which resume-predicate leg is actually blocking, battery preferred:
+    /// the cooling line shows only when thermals block and battery does not.
+    public static func pauseBlockedByHeatOnly(_ s: MachineSnapshot) -> Bool {
+        let batteryBlocks = (s.batteryPercent ?? 0) < s.batteryFloor + resumeMargin
+        let thermalBlocks = s.thermalOKSeconds < thermalCalmRequirement
+        return thermalBlocks && !batteryBlocks
+    }
+
     private static func pauseNotice(_ s: MachineSnapshot) -> Notice {
-        if let percent = s.batteryPercent, percent >= s.batteryFloor + resumeMargin {
-            return .hotPaused
-        }
-        return .floorPaused(s.batteryFloor)
+        pauseBlockedByHeatOnly(s) ? .hotPaused : .floorPaused(s.batteryFloor)
     }
 }
