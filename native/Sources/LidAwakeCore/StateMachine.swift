@@ -302,9 +302,12 @@ public enum StateMachine {
         }
 
         if s.acDeclined {
-            // Declined: the lid sleeps the Mac — unless a held one-shot must
-            // keep a closed-lid Mac awake until unplug.
-            let mustStayAwake = oneShot && s.lid == .closed
+            // Declined: the lid sleeps the Mac — unless a one-shot hold is
+            // live. The hold is NOT lid-conditioned: the icon and header
+            // promise Keep awake, so an open-then-close on AC must never
+            // sleep the Mac out from under that promise. The 30-minute
+            // expiry above still clears open-lid zombie holds.
+            let mustStayAwake = oneShot
             if s.sleepDisabled && !mustStayAwake {
                 e += [.setSleepDisabled(false, verify: true), .log("on-power Keep awake stays declined")]
             } else if !s.sleepDisabled && mustStayAwake {
@@ -418,7 +421,9 @@ public enum StateMachine {
     public static func declineOnPower(_ s: MachineSnapshot) -> Decision {
         guard s.power == .ac else { return Decision() }
         var e: [Effect] = []
-        if s.sleepDisabled && !(s.oneShotActive && s.lid == .closed) {
+        // A live one-shot hold keeps pmset on through the decline, lid open
+        // or closed — same non-lid-conditioned promise as the tick.
+        if s.sleepDisabled && !s.oneShotActive {
             e.append(.setSleepDisabled(false, verify: true))
         }
         e += [.setACDeclined(true), .log("on-power Keep awake declined")]

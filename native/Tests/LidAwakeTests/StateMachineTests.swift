@@ -239,6 +239,35 @@ private extension Decision {
         #expect(d.enables, "the hold is the only thing keeping the closed lid awake")
     }
 
+    @Test func declinedHoldIsNotLidConditioned() {
+        // Open-then-close on AC while declined must never sleep a Mac whose
+        // icon and header promise Keep awake: a live hold keeps pmset on
+        // with the lid open too (the 30-min expiry clears open-lid zombies).
+        let open = StateMachine.tick(snap(power: .ac, lid: .open, disabled: true,
+                                          oneShot: true, declined: true, hold: 60))
+        #expect(!open.restoresDefault, "a live hold keeps SleepDisabled with the lid open")
+        let openIdle = StateMachine.tick(snap(power: .ac, lid: .open, disabled: false,
+                                              oneShot: true, declined: true, hold: 60))
+        #expect(openIdle.enables, "a live hold re-enables pmset with the lid open")
+    }
+
+    @Test func declineOnPowerWithLiveHoldKeepsPmsetOn() {
+        for lid in [LidState.open, .closed] {
+            let d = StateMachine.declineOnPower(snap(power: .ac, lid: lid,
+                                                     disabled: true, oneShot: true, hold: 60))
+            #expect(!d.restoresDefault, "declining never drops a live hold (lid \(lid))")
+            #expect(d.effects.contains(.setACDeclined(true)))
+        }
+    }
+
+    @Test func declineOnPowerWithoutHoldDropsPmset() {
+        let d = StateMachine.declineOnPower(snap(power: .ac, disabled: true))
+        #expect(d.restoresDefault)
+        #expect(d.effects.contains(.setACDeclined(true)))
+        let battery = StateMachine.declineOnPower(snap(power: .battery, disabled: true))
+        #expect(battery.effects.isEmpty, "the moon click only exists on power")
+    }
+
     @Test func unplugRechecksFloorAtOrBelowEnds() {
         let d = StateMachine.tick(snap(power: .battery, prevPower: .ac, battery: 20,
                                        lid: .closed, disabled: true, oneShot: true, hold: 300))
