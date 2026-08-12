@@ -9,6 +9,16 @@
 # the app is deleted so KeepAlive cannot respawn-loop on a missing binary.
 set -u
 
+# Root-safe: if invoked via `sudo`, re-run as the invoking user. As root,
+# `gui/$(id -u)` points at launchd domain gui/0 and $HOME at /var/root, so
+# the bootout, guard-plist removal, ~/.lidawake cleanup, and `defaults`
+# deletes would all miss the real account — leaving a KeepAlive plist that
+# respawn-loops on the deleted app at next login. The invoking user's sudo
+# timestamp is already cached, so the pmset step below won't re-prompt.
+if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
+  exec sudo -u "$SUDO_USER" -H bash "$0" "$@"
+fi
+
 echo "Restoring normal sleep (needs your password once)…"
 sudo pmset -a disablesleep 0
 

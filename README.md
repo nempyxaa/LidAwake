@@ -129,10 +129,13 @@ sleeps.` — when anything is active. It unloads and removes the watchdog
 LaunchAgent before exiting.
 
 To uninstall, run the script — it is safe from any state, including after a
-crash or force-quit:
+crash or force-quit. Run it as yourself, without `sudo` — it elevates only
+the steps that need it and prompts for your password once. (Run under
+`sudo` anyway, it re-executes as your user, so per-user cleanup still lands
+in the right account.)
 
 ```sh
-sudo bash packaging/uninstall.sh
+bash packaging/uninstall.sh
 ```
 
 Or by hand. **Order matters.** A crash or force-quit can strand
