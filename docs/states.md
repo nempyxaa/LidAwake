@@ -156,5 +156,5 @@ state-machine tests sweep every canonical string for the banned forms.
 ## Screenshots
 
 The approved mockups are committed under [mockups/](mockups/) —
-`lid-awake-v3-mockups.html` (panels rev 2, strings finalized in the rev 3
+`lidawake-v3-mockups.html` (panels rev 2, strings finalized in the rev 3
 spec). TODO: replace with real menu screenshots post-build.
