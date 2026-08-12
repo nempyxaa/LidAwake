@@ -70,6 +70,11 @@ Replace `yourusername` with your macOS account name. If the rule is missing,
 the app presents the correct user-specific line with a copy button. Read the
 rule before installing it: it allows only the five command forms the app uses.
 
+The `lowpowermode` pair is there because Keep awake on battery also turns on
+system Low Power Mode to stretch the battery while the lid is closed. When
+Keep awake ends, the app restores the Low Power Mode value you had before it
+armed — a snapshot taken at arm, never a blind force-off.
+
 ## Safety behavior
 
 - The floor and heat always end Keep awake, in every mode — on power too.

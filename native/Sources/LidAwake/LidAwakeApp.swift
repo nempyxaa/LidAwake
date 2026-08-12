@@ -31,6 +31,13 @@ private final class RuntimeState {
     var skipOnce: Bool { get { d.bool(forKey: "skipOnce") } set { d.set(newValue, forKey: "skipOnce") } }
     var alwaysPaused: Bool { get { d.bool(forKey: "alwaysPaused") } set { d.set(newValue, forKey: "alwaysPaused") } }
     var acHoldStart: Date? { get { d.object(forKey: "acHoldStart") as? Date } set { d.set(newValue, forKey: "acHoldStart") } }
+    /// The user's own Low Power Mode value, snapshotted the moment Keep awake
+    /// first turns LPM on; restored — never blind-forced off — when Keep
+    /// awake ends. Persisted so a crash or reboot cannot orphan the value.
+    var priorLowPowerMode: Int? {
+        get { d.object(forKey: "priorLowPowerMode") as? Int }
+        set { if let newValue { d.set(newValue, forKey: "priorLowPowerMode") } else { d.removeObject(forKey: "priorLowPowerMode") } }
+    }
     var lastHotAt: Date? { get { d.object(forKey: "lastHotAt") as? Date } set { d.set(newValue, forKey: "lastHotAt") } }
     var postmortem: String? {
         get { d.string(forKey: "postmortem") }
@@ -265,7 +272,19 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
                     return false
                 }
             case let .setLowPowerMode(value):
-                _ = Shell.pmset(["-b", "lowpowermode", value ? "1" : "0"], sudo: true)
+                // Snapshot-and-restore (decision D3): remember the user's own
+                // LPM value before the first turn-on, put it back at the end.
+                // With no snapshot we never touched LPM — leave it alone
+                // rather than blind-forcing it off.
+                if value {
+                    if state.priorLowPowerMode == nil {
+                        state.priorLowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled ? 1 : 0
+                    }
+                    _ = Shell.pmset(["-b", "lowpowermode", "1"], sudo: true)
+                } else if let prior = state.priorLowPowerMode {
+                    _ = Shell.pmset(["-b", "lowpowermode", String(prior)], sudo: true)
+                    state.priorLowPowerMode = nil
+                }
             case let .setOneShot(value):
                 state.oneShotActive = value
                 if value { state.postmortem = nil } // the line persists until the next arm
