@@ -23,29 +23,53 @@ forced sleep happens only while the lid is closed — an open, in-use Mac is
 never put to sleep.
 
 The full state diagram, transition rules, and an honest limitations list live
-in [docs/states.md](docs/states.md).
+in [docs/states.md](docs/states.md). The approved menu mockups are in
+[docs/mockups/lidawake-v3-mockups.html](docs/mockups/lidawake-v3-mockups.html);
+real screenshots replace them post-build.
 
-## Build
+## Requirements
 
-```sh
-./native/build.sh
-```
-
-The script runs `swift test` and a universal release `swift build` in
-`native/`, then produces the ad-hoc signed bundle at
-`native/build/LidAwake.app` and verifies both `arm64` and `x86_64`. It does
-not install or launch anything.
+- macOS 14.4 or newer (Apple silicon or Intel; the app menu uses
+  `NSMenuItem.subtitle`).
+- To build: the Swift 6 toolchain — Xcode 16, or the Command Line Tools 16
+  or newer. No full Xcode needed.
 
 ## Install
 
-1. Build the app.
-2. Move `native/build/LidAwake.app` to `/Applications`.
-3. Add the sudoers rule below with `sudo visudo -f /etc/sudoers.d/lidawake`.
-4. Open `/Applications/LidAwake.app`.
+Prebuilt packages will appear on the
+[Releases page](https://github.com/nempyxaa/LidAwake/releases) with the
+v3.0.0 tag (the older v1 asset there is the retired identity — skip it).
+Until then, build from source:
 
-Alternatively, `packaging/build-pkg.sh` builds an installer package
-(`lidawake-<version>.pkg`) that does steps 2–4, deletes an old `lid-awake.app`
-from a v2 install, and installs the restricted sudoers rule for admin users.
+```sh
+git clone https://github.com/nempyxaa/LidAwake.git
+cd LidAwake
+./packaging/build-pkg.sh
+sudo installer -pkg lidawake-3.0.0.pkg -target /
+```
+
+The pkg puts `LidAwake.app` in `/Applications`, installs the restricted
+sudoers rule below for admin users, deletes an old `lid-awake.app` from a v2
+install, and opens the app. The build prints the package's SHA-256 —
+compare it if the pkg traveled anywhere before installing.
+
+Upgrading from v2? The installer removes the old app and its sudoers file.
+If you had added v2's per-user rule by hand, remove the leftover with
+`sudo rm -f /etc/sudoers.d/lid-awake`.
+
+To skip the installer:
+
+```sh
+./native/build.sh
+mv native/build/LidAwake.app /Applications/
+sudo visudo -f /etc/sudoers.d/lidawake   # add the rule from Permission below
+open /Applications/LidAwake.app
+```
+
+`native/build.sh` runs `swift test` and a universal release `swift build` in
+`native/`, then produces the ad-hoc signed bundle at
+`native/build/LidAwake.app` and verifies both `arm64` and `x86_64`. It does
+not install or launch anything.
 
 On first launch from `/Applications` the app installs its watchdog: a
 per-user KeepAlive LaunchAgent (`app.lidawake.guard`) that starts the app at
@@ -55,8 +79,6 @@ and defaults from the retired identifiers (`com.nempyxaa.lid-awake`, the
 `~/.lid-awake` state dir), and sweeps v1 remnants by enumeration (agents,
 SwiftBar plugins, scripts — each removed file is first backed up under
 `~/.lidawake/backups/`). Only one instance runs at a time.
-
-macOS 14.4 or newer.
 
 ## Permission
 
