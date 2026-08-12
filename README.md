@@ -33,6 +33,16 @@ yourusername ALL=(root) NOPASSWD: /usr/bin/pmset -a disablesleep 0, /usr/bin/pms
 
 Replace `yourusername` with your macOS account name. If the rule is missing, the app presents the correct user-specific line with a copy button. Read the rule before installing it: it allows only the five command forms the app uses.
 
+## Package installer
+
+`packaging/build-pkg.sh` builds the app and wraps it in an installer package:
+
+```sh
+packaging/build-pkg.sh
+```
+
+The version defaults to the app's `CFBundleShortVersionString`. The package installs `lid-awake.app` into `/Applications` and writes the restricted sudoers rule above for the user logged in at install time, replacing the broader rule the v1 installer left if there is one. It then opens the app; the first launch registers the LaunchAgent and login item and cleans up v1 leftovers. The package is unsigned, like the source build.
+
 ## Safety behavior
 
 - On AC power, keep-awake turns on unless you manually switched it off.
