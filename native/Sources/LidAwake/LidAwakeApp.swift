@@ -79,6 +79,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private let state = RuntimeState()
     private var timer: Timer?
     private var permissionAlertShown = false
+    /// One notification per failure streak: without the sudoers rule the
+    /// 60-second tick would otherwise notify forever. The per-tick log line
+    /// stays; the streak resets on the first verified write that succeeds.
+    private var failureStreakNotified = false
     private var activity: NSObjectProtocol?
     private var headless = false
     private var postmortemDisplayed = false
@@ -267,10 +271,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
                 _ = Shell.pmset(["-a", "disablesleep", value ? "1" : "0"], sudo: true)
                 if verify && sleepDisabled() != value {
                     appendLog(value ? "enable FAILED (pmset)" : "REVERT-VERIFY FAILED (SleepDisabled still 1)")
-                    deliverNotification(body: value ? V3Strings.notifyFailure : V3Strings.notifyRevertFailure)
+                    if !failureStreakNotified {
+                        failureStreakNotified = true
+                        deliverNotification(body: value ? V3Strings.notifyFailure : V3Strings.notifyRevertFailure)
+                    }
                     showSudoFix()
                     return false
                 }
+                if verify { failureStreakNotified = false }
             case let .setLowPowerMode(value):
                 // Snapshot-and-restore (decision D3): remember the user's own
                 // LPM value before the first turn-on, put it back at the end.
@@ -669,19 +677,44 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             old.forceTerminate()
             appendLog("terminated running v2 instance (com.nempyxaa.lid-awake) for migration")
         }
+        let selfPID = ProcessInfo.processInfo.processIdentifier
         let peers = NSRunningApplication
             .runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "app.lidawake")
-            .filter { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier && !$0.isTerminated }
+            .filter { $0.processIdentifier != selfPID && !$0.isTerminated }
+        guard !peers.isEmpty else { return true }
+        // v3 peers: the launchd-owned instance wins (it is the supervised
+        // one — yielding to a manual instance would leave the survivor
+        // unwatched); with no launchd owner among us, the lowest PID wins,
+        // so two racing fresh instances can never both exit.
+        let guardPID = guardJobPID()
         var ok = true
         for peer in peers {
             if peer.bundleURL?.lastPathComponent == "lid-awake.app" {
                 peer.forceTerminate()
                 appendLog("terminated running v2 instance for migration")
-            } else {
+            } else if guardPID == selfPID {
+                continue // we are launchd's instance; the peer will yield
+            } else if guardPID == peer.processIdentifier {
+                appendLog("yielding to the launchd-owned instance (pid \(peer.processIdentifier))")
+                ok = false
+            } else if selfPID > peer.processIdentifier {
+                appendLog("yielding to the lower-PID instance (pid \(peer.processIdentifier))")
                 ok = false
             }
         }
         return ok
+    }
+
+    /// PID of the process launchd currently runs for the guard job, if any.
+    private func guardJobPID() -> Int32? {
+        let output = Shell.run("/bin/launchctl", ["print", "gui/\(getuid())/app.lidawake.guard"]).1
+        for line in output.split(separator: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("pid = ") {
+                return Int32(trimmed.dropFirst("pid = ".count).trimmingCharacters(in: .whitespaces))
+            }
+        }
+        return nil
     }
 
     private var runsFromApplications: Bool {
@@ -700,10 +733,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         }
         migrateLegacyInstall()
         removeOldBundle()
-        installGuardAgentIfNeeded()
         // v3 uses the KeepAlive LaunchAgent (RunAtLoad covers login); retire
-        // any v2 login item so only one launcher owns the app.
+        // any v2 login item so only one launcher owns the app. This runs
+        // before the guard install because a fresh bootstrap hands off to
+        // the launchd-owned instance and terminates this one.
         if SMAppService.mainApp.status == .enabled { try? SMAppService.mainApp.unregister() }
+        installGuardAgentIfNeeded()
     }
 
     // The v2 bundle was lid-awake.app — a different APFS entry from
@@ -743,7 +778,18 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             _ = Shell.run("/bin/launchctl", ["bootout", domain + "/app.lidawake.guard"])
             try data.write(to: guardPlistURL, options: .atomic)
             let result = Shell.run("/bin/launchctl", ["bootstrap", domain, guardPlistURL.path])
-            if result.0 != 0 { appendLog("guard LaunchAgent bootstrap failed") }
+            guard result.0 == 0 else { appendLog("guard LaunchAgent bootstrap failed"); return }
+            // Hand the session to the launchd-owned instance: kickstart the
+            // job (RunAtLoad usually already started it) and, when this
+            // process is not the one launchd runs, exit cleanly. Staying
+            // alive would leave THIS instance unsupervised — launchd's
+            // duplicate yields in resolveSingleInstance and the KeepAlive
+            // job then sits dormant until the next login.
+            _ = Shell.run("/bin/launchctl", ["kickstart", domain + "/app.lidawake.guard"])
+            if guardJobPID() != ProcessInfo.processInfo.processIdentifier {
+                appendLog("guard agent bootstrapped; handing off to the launchd-owned instance")
+                NSApp.terminate(nil)
+            }
         } catch { appendLog("guard LaunchAgent install failed: \(error.localizedDescription)") }
     }
     private func unloadGuardAgent(removeFile: Bool) {
