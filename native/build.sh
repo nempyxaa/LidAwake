@@ -1,33 +1,30 @@
 #!/bin/bash
+# Builds the universal, ad-hoc signed LidAwake.app and runs the tests.
+# No spaces in any filename: the bundle is LidAwake.app; Finder shows
+# "Lid Awake" via CFBundleDisplayName.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 NATIVE="$ROOT/native"
 OUT="$NATIVE/build"
-APP="$OUT/lid-awake.app"
-SDK="$(xcrun --sdk macosx --show-sdk-path)"
+APP="$OUT/LidAwake.app"
 
-rm -rf "$APP" "$OUT/arm64" "$OUT/x86_64"
-mkdir -p "$APP/Contents/MacOS" "$OUT/arm64" "$OUT/x86_64"
+cd "$NATIVE"
+swift test
+swift build -c release --arch arm64 --arch x86_64
+BIN="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)/LidAwake"
+
+rm -rf "$APP" "$OUT/lid-awake.app"
+mkdir -p "$APP/Contents/MacOS"
 cp "$NATIVE/Info.plist" "$APP/Contents/Info.plist"
+cp "$BIN" "$APP/Contents/MacOS/LidAwake"
 
-SOURCES=("$NATIVE/Sources/StateMachine.swift" "$NATIVE/Sources/LidAwakeApp.swift")
-FRAMEWORKS=(-framework AppKit -framework UserNotifications -framework ServiceManagement)
-for ARCH in arm64 x86_64; do
-  xcrun swiftc -parse-as-library -O -target "$ARCH-apple-macosx13.0" -sdk "$SDK" \
-    -module-cache-path "$OUT/$ARCH/module-cache" \
-    "${SOURCES[@]}" "${FRAMEWORKS[@]}" -o "$OUT/$ARCH/lid-awake"
-done
-xcrun lipo -create "$OUT/arm64/lid-awake" "$OUT/x86_64/lid-awake" -output "$APP/Contents/MacOS/lid-awake"
 codesign --force --deep --sign - "$APP"
 plutil -lint "$APP/Contents/Info.plist"
 codesign --verify --deep --strict "$APP"
-ARCHS="$(xcrun lipo -archs "$APP/Contents/MacOS/lid-awake" | tr ' ' '\n' | sort | xargs)"
+ARCHS="$(xcrun lipo -archs "$APP/Contents/MacOS/LidAwake" | tr ' ' '\n' | sort | xargs)"
 if [[ "$ARCHS" != "arm64 x86_64" ]]; then
   echo "unexpected executable architectures: $ARCHS" >&2
   exit 1
 fi
 echo "$ARCHS"
-
-swiftc -module-cache-path "$OUT/test-module-cache" \
-  "$NATIVE/Sources/StateMachine.swift" "$NATIVE/Tests/StateMachineTests.swift" -o "$OUT/state-machine-tests"
-"$OUT/state-machine-tests"
+echo "Built $APP"
