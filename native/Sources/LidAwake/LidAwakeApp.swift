@@ -9,9 +9,14 @@ private enum Shell {
     static func run(_ executable: String, _ arguments: [String]) -> (Int32, String) {
         let task = Process(), pipe = Pipe()
         task.executableURL = URL(fileURLWithPath: executable)
-        task.arguments = arguments; task.standardOutput = pipe; task.standardError = Pipe()
-        do { try task.run(); task.waitUntilExit() } catch { return (-1, "") }
+        task.arguments = arguments; task.standardOutput = pipe
+        task.standardError = FileHandle.nullDevice
+        do { try task.run() } catch { return (-1, "") }
+        // Read to EOF BEFORE waitUntilExit: waiting first deadlocks forever
+        // once the child fills the 64KB pipe buffer (launchctl list does on
+        // agent-heavy Macs — v2's healthy-process-no-icon signature).
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        task.waitUntilExit()
         return (task.terminationStatus, String(data: data, encoding: .utf8) ?? "")
     }
     static func pmset(_ args: [String], sudo: Bool = false) -> (Int32, String) {
@@ -617,7 +622,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private var runsFromApplications: Bool {
         Bundle.main.bundleURL.standardizedFileURL.path.hasPrefix("/Applications/")
     }
-    private var guardPlistURL: URL {
+    nonisolated private var guardPlistURL: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/LaunchAgents/app.lidawake.guard.plist")
     }
     private func configurePersistentServices() {
@@ -686,10 +691,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     // lv.fleet.lidguard and lid.10s.sh running in parallel with v2 because
     // the old code only looked for the names it had installed itself. The
     // bundle-id switch to app.lidawake retires com.nempyxaa.lid-awake.* too.
-    private var legacyAgentNames: Set<String> {
+    nonisolated private var legacyAgentNames: Set<String> {
         ["org.lidawake.guard.plist", "lv.fleet.lidguard.plist", "com.nempyxaa.lid-awake.guard.plist"]
     }
-    private var legacyPluginNames: Set<String> { ["lidawake.10s.sh", "lid.10s.sh"] }
+    nonisolated private var legacyPluginNames: Set<String> { ["lidawake.10s.sh", "lid.10s.sh"] }
     private var legacyScriptNames: [String] { ["lid-battery-guard.sh", "lid-toggle.sh", "lid-settings.sh", "lidawake.10s.sh", "thermalstate"] }
     // Tokens that appear in legacy launchd labels — v1's, and the retired
     // com.nempyxaa.lid-awake.* labels. The remnant check first drops every
@@ -697,12 +702,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     // and the running app's application.app.lidawake.* entries), so these
     // tokens cannot match the new agent; bystanders like
     // com.apple.ATS.FontValidator never matched either way.
-    private var legacyLaunchdTokens: [String] { ["lidawake", "lidguard", "lid-guard", "lid-awake", "lv.fleet.lid"] }
+    nonisolated private var legacyLaunchdTokens: [String] { ["lidawake", "lidguard", "lid-guard", "lid-awake", "lv.fleet.lid"] }
 
-    private func listDirectory(_ dir: URL) -> [URL] {
+    nonisolated private func listDirectory(_ dir: URL) -> [URL] {
         (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
     }
-    private func isLegacyAgentPlist(_ url: URL) -> Bool {
+    nonisolated private func isLegacyAgentPlist(_ url: URL) -> Bool {
         guard url.pathExtension == "plist", url.lastPathComponent != guardPlistURL.lastPathComponent else { return false }
         if legacyAgentNames.contains(url.lastPathComponent) { return true }
         guard let content = try? String(contentsOf: url, encoding: .utf8) else { return false }
@@ -711,12 +716,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
     // Content match keys on the v1 action scripts, not on ".lid-awake": a
     // user-authored plugin that merely displays state must survive.
-    private func isLegacyPlugin(_ url: URL) -> Bool {
+    nonisolated private func isLegacyPlugin(_ url: URL) -> Bool {
         if legacyPluginNames.contains(url.lastPathComponent) { return true }
         guard url.pathExtension == "sh", let content = try? String(contentsOf: url, encoding: .utf8) else { return false }
         return content.contains("lid-toggle") || content.contains("lid-battery-guard")
     }
-    private func swiftBarPluginDirectories() -> [URL] {
+    nonisolated private func swiftBarPluginDirectories() -> [URL] {
         let fm = FileManager.default
         var dirs: [URL] = []
         let configured = Shell.run("/usr/bin/defaults", ["read", "com.ameba.SwiftBar", "PluginDirectory"]).1
@@ -787,7 +792,18 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         _ = Shell.run("/usr/bin/pkill", ["-f", "lid-battery-guard"])
 
         for path in removed { appendLog("migration removed \(path) (backup: \(backupDir.path))") }
-        for remnant in legacyRemnants() { appendLog("migration VERIFY FAILED: \(remnant)") }
+        // The remnant verification shells out to `launchctl list`, whose
+        // output can be large on agent-heavy Macs. It must never run on the
+        // pre-icon critical path (or the main thread at all) — the sweep is
+        // diagnostic only and retries on the next launch anyway.
+        Task.detached(priority: .utility) { [weak self] in
+            guard let self else { return }
+            let remnants = self.legacyRemnants()
+            guard !remnants.isEmpty else { return }
+            await MainActor.run {
+                for remnant in remnants { self.appendLog("migration VERIFY FAILED: \(remnant)") }
+            }
+        }
         if !removed.isEmpty && !headless {
             let alert = NSAlert()
             alert.messageText = "Old version removed"
@@ -800,7 +816,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     // names: loaded launchd jobs, LaunchAgent plists, every SwiftBar plugin
     // directory, and running processes. Failures are logged and the sweep
     // retries on the next launch.
-    private func legacyRemnants() -> [String] {
+    nonisolated private func legacyRemnants() -> [String] {
         let home = FileManager.default.homeDirectoryForCurrentUser
         var remnants: [String] = []
         // Drop every line carrying the current identifier first: the new
