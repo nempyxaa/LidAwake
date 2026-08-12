@@ -10,13 +10,18 @@ APP="$OUT/LidAwake.app"
 
 cd "$NATIVE"
 swift test
-swift build -c release --arch arm64 --arch x86_64
-BIN="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)/LidAwake"
+# Per-arch builds + lipo: works with the Command Line Tools alone
+# (the combined --arch invocation needs full Xcode's xcbuild).
+for TRIPLE in arm64-apple-macosx14.4 x86_64-apple-macosx14.4; do
+  swift build -c release --triple "$TRIPLE"
+done
+BIN_ARM="$(swift build -c release --triple arm64-apple-macosx14.4 --show-bin-path)/LidAwake"
+BIN_X86="$(swift build -c release --triple x86_64-apple-macosx14.4 --show-bin-path)/LidAwake"
 
 rm -rf "$APP" "$OUT/lid-awake.app"
 mkdir -p "$APP/Contents/MacOS"
 cp "$NATIVE/Info.plist" "$APP/Contents/Info.plist"
-cp "$BIN" "$APP/Contents/MacOS/LidAwake"
+xcrun lipo -create "$BIN_ARM" "$BIN_X86" -output "$APP/Contents/MacOS/LidAwake"
 
 codesign --force --deep --sign - "$APP"
 plutil -lint "$APP/Contents/Info.plist"
