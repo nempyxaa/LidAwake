@@ -466,6 +466,15 @@ private extension Decision {
         #expect(d.effects.contains(.setACHold(false)))
     }
 
+    @Test func acDeclineDiesAtReboot() {
+        // D1: policies survive reboot, session gestures do not — the
+        // on-power decline is a gesture. It survives unplug only.
+        for hadOneShot in [false, true] {
+            let d = StateMachine.reboot(hadOneShot: hadOneShot)
+            #expect(d.effects.contains(.setACDeclined(false)))
+        }
+    }
+
     @Test func alwaysSurvivesReboot() {
         let d = StateMachine.reboot(hadOneShot: false)
         #expect(d.postmortems.isEmpty)
@@ -564,7 +573,10 @@ private extension Decision {
         #expect(V3Strings.armSubIgnoringLid(20) == "Ignoring lid, until 20% or hot")
         #expect(V3Strings.armSubChangeMode == "Change mode in Settings")
         #expect(V3Strings.armSubOnPower == "On power: Keep awake automatically")
+        #expect(V3Strings.armDisabledLow(20) == "Battery at or below 20%")
+        #expect(V3Strings.armDisabledHot == "Cooling down")
         #expect(V3Strings.turnOff == "Turn off Keep awake")
+        #expect(V3Strings.turnOffOnPowerSub == "Stays off on power until you turn it back on")
         #expect(V3Strings.sleepNowSubOneShot == "Sleeps and turns Keep awake off")
         #expect(V3Strings.skipOnceItem == "Sleep on next lid close")
         #expect(V3Strings.skipOnceSub == "Always Keep awake stays on")
@@ -594,5 +606,6 @@ private extension Decision {
         #expect(V3Strings.modeRadioAlways(25) == "Always when on battery: until 25% or hot")
         #expect(V3Strings.pausedFloor(30) == "Keep awake resumes at 35%")
         #expect(V3Strings.untilOneShotLid(15) == "Until: lid opens, 15%, or hot")
+        #expect(V3Strings.armDisabledLow(30) == "Battery at or below 30%")
     }
 }

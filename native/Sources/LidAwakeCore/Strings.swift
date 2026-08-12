@@ -52,10 +52,14 @@ public enum V3Strings {
     public static let armSubChangeMode = "Change mode in Settings"
     public static let armSubOnPower = "On power: Keep awake automatically"
     public static func armDisabledLow(_ floor: Int) -> String {
-        "Battery below \(floor)%"
+        // D7: floorHit is <=, so "below" would be false at exactly N%.
+        "Battery at or below \(floor)%"
     }
     public static let armDisabledHot = "Cooling down"
     public static let turnOff = "Turn off Keep awake"
+    /// Subtitle on the moon item in the on-power idle menu (D2): the decline
+    /// is standing on power, so the item says so.
+    public static let turnOffOnPowerSub = "Stays off on power until you turn it back on"
     public static let sleepNow = "Sleep now"
     public static let sleepNowSubOneShot = "Sleeps and turns Keep awake off"
     public static let skipOnceItem = "Sleep on next lid close"
@@ -114,7 +118,7 @@ public enum V3Strings {
          pausedFloor(floor), pausedHot, postmortem(18, "14:05"),
          armItem, armSubUntilLid(floor), armSubIgnoringLid(floor), armSubChangeMode,
          armSubOnPower, armDisabledLow(floor), armDisabledHot,
-         turnOff, sleepNow, sleepNowSubOneShot,
+         turnOff, turnOffOnPowerSub, sleepNow, sleepNowSubOneShot,
          skipOnceItem, skipOnceSub, skipOnceArmedItem,
          turnOffAlwaysItem, turnOffAlwaysSub, settings,
          showNotifications, floorItem(floor), floorOption(floor), floorOptionEndsCurrent(floor),

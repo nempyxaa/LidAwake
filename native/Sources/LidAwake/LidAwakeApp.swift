@@ -440,7 +440,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         arm.subtitle = V3Strings.armSubOnPower
         if !s.acDeclined {
             // The moon: clicking it declines automatic on-power Keep awake.
-            add(V3Strings.turnOff, image: "moon.zzz.fill", action: #selector(declineClicked), to: menu)
+            // The decline is standing (until re-enabled on power; it dies at
+            // reboot) — the subtitle says so (D2).
+            let moon = add(V3Strings.turnOff, image: "moon.zzz.fill", action: #selector(declineClicked), to: menu)
+            moon.subtitle = V3Strings.turnOffOnPowerSub
         }
         add(V3Strings.sleepNow, image: "zzz", action: #selector(sleepNowClicked), to: menu)
     }

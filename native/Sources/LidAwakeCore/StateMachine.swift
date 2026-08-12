@@ -519,10 +519,12 @@ public enum StateMachine {
         return Decision(effects: e)
     }
 
-    /// Boot-time reconcile after a restart: one-shots (and skip-once) die,
-    /// Always survives. A one-shot that died records the postmortem line.
+    /// Boot-time reconcile after a restart: one-shots, skip-once, and the
+    /// on-power decline die; Always survives. Policies survive reboot,
+    /// session gestures do not — and the decline is a gesture (D1). A
+    /// one-shot that died records the postmortem line.
     public static func reboot(hadOneShot: Bool) -> Decision {
-        var e: [Effect] = [.setSkipOnce(false), .setACHold(false)]
+        var e: [Effect] = [.setSkipOnce(false), .setACHold(false), .setACDeclined(false)]
         if hadOneShot {
             e += [.setOneShot(false), .recordPostmortem(.restart),
                   .log("one-shot did not survive the restart")]

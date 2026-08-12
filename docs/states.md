@@ -95,10 +95,14 @@ stateDiagram-v2
   floor + 5%, or right after a thermal blip has cleared, arming is allowed.
 - **Plugging in never causes a sleep by itself.** Only heat force-sleeps
   mid-transition, and only with the lid closed.
-- **Decline is standing:** the moon click on power declines automatic Keep
-  awake until you click the arm item on power again. It survives unplug and
-  reboot — that is what makes the declined + lid-closed hold exception
-  reachable.
+- **Decline is standing on power:** the moon click on power declines
+  automatic Keep awake until you click the arm item on power again. It
+  survives unplug — that is what makes the declined-hold exception
+  reachable — but dies at reboot: policies survive reboot, session gestures
+  do not, and the decline is a gesture. While a held one-shot is live, the
+  decline never drops `SleepDisabled` — lid open or closed — so an
+  open-then-close on power cannot sleep a Mac whose header promises Keep
+  awake; the 30-minute expiry still clears open-lid holds.
 - **Skip-once** is consumed only by a lid-close sleep (Sleep now does not
   consume it), cleared by any mode change, and dies at reboot.
 - **Postmortem line** (`Last Keep awake: ended at N%, HH:MM`) records only
