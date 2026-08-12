@@ -54,7 +54,21 @@ private final class RuntimeState {
 
 @MainActor
 private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
-    private lazy var status = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    // The status item carries an image from the moment it exists: v2's
+    // worst regression was a healthy process with an empty menu-bar slot.
+    // If even the placeholder symbol fails to load, the title falls back
+    // to "LA" so there is always something visible to click.
+    private lazy var status: NSStatusItem = {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        if let placeholder = NSImage(systemSymbolName: "cup.and.saucer",
+                                     accessibilityDescription: V3Strings.appName) {
+            placeholder.isTemplate = true
+            item.button?.image = placeholder
+        } else {
+            item.button?.title = V3Strings.iconFallback
+        }
+        return item
+    }()
     private let state = RuntimeState()
     private var timer: Timer?
     private var permissionAlertShown = false
@@ -63,6 +77,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private var postmortemDisplayed = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        _ = status // create the status item (with its placeholder icon) FIRST
         migrateStateDirectory()
         guard resolveSingleInstance() else { NSApp.terminate(nil); return }
         registerDefaults()
@@ -305,7 +320,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         guard !headless else { return }
         let s = snapshot(), menu = status.menu ?? NSMenu()
         menu.removeAllItems()
-        status.button?.image = icon(for: s)
+        if let image = icon(for: s) {
+            status.button?.image = image
+            status.button?.title = ""
+        } else {
+            // Never an imageless, titleless status item — the v2 regression.
+            status.button?.image = nil
+            status.button?.title = V3Strings.iconFallback
+        }
 
         if let line = state.postmortem { add(line, enabled: false, to: menu) }
 
@@ -491,12 +513,24 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         let size = filled.size
         let slashed = NSImage(size: size, flipped: false) { rect in
             filled.draw(in: rect)
-            let slash = NSBezierPath()
-            slash.move(to: NSPoint(x: rect.minX + 1, y: rect.minY + 1))
-            slash.line(to: NSPoint(x: rect.maxX - 1, y: rect.maxY - 1))
-            slash.lineWidth = 1.5
+            // On a template image only the alpha channel matters: a stroked
+            // slash over the opaque glyph is invisible. Knock a wide gap out
+            // of the glyph with .destinationOut, then draw the slash inside
+            // the gap so it reads as a line in light, dark, and contrast.
+            let path = NSBezierPath()
+            path.move(to: NSPoint(x: rect.minX + 1, y: rect.minY + 1))
+            path.line(to: NSPoint(x: rect.maxX - 1, y: rect.maxY - 1))
+            if let ctx = NSGraphicsContext.current?.cgContext {
+                ctx.saveGState()
+                ctx.setBlendMode(.destinationOut)
+                path.lineWidth = 3.5
+                NSColor.black.setStroke()
+                path.stroke()
+                ctx.restoreGState()
+            }
+            path.lineWidth = 1.5
             NSColor.black.setStroke()
-            slash.stroke()
+            path.stroke()
             return true
         }
         slashed.isTemplate = true

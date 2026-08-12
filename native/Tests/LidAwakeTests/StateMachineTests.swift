@@ -576,6 +576,7 @@ private extension Decision {
         #expect(V3Strings.modeRadioIgnoringLid(20) == "When turned on: ignoring lid, until 20% or hot")
         #expect(V3Strings.modeRadioAlways(20) == "Always when on battery: until 20% or hot")
         #expect(V3Strings.appName == "LidAwake")
+        #expect(V3Strings.iconFallback == "LA")
         #expect(V3Strings.about == "About LidAwake")
         #expect(V3Strings.quit == "Quit LidAwake")
         #expect(V3Strings.quitConfirm == "Quitting turns off Keep awake; next lid close sleeps.")

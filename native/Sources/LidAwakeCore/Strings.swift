@@ -6,6 +6,9 @@ import Foundation
 
 public enum V3Strings {
     public static let appName = "LidAwake"
+    /// Status-item title when no icon image could be produced — the status
+    /// item must never sit imageless AND titleless (the v2 regression).
+    public static let iconFallback = "LA"
 
     // MARK: Headers (disabled lines; the battery line is always last)
     public static let idleHeader = "Lid closed: sleeps"
@@ -105,7 +108,7 @@ public enum V3Strings {
     /// Every canonical string, rendered for a given floor — used by the tests
     /// to enforce the proper-name rule mechanically.
     public static func allStrings(floor: Int) -> [String] {
-        [appName, idleHeader, oneShotHeader, alwaysHeader, acHeaderOn, acHeaderDeclined,
+        [appName, iconFallback, idleHeader, oneShotHeader, alwaysHeader, acHeaderOn, acHeaderDeclined,
          acHoldHeader, battery(40), batteryCharging(78),
          untilOneShotLid(floor), untilOneShotIgnoringLid(floor), alwaysUntil(floor),
          pausedFloor(floor), pausedHot, postmortem(18, "14:05"),
