@@ -101,23 +101,40 @@ diagnostics go to `~/.lidawake/state/lid-guard.log`.
 
 ## Quit and uninstall
 
-Use **Quit LidAwake** in Settings first. It always reverts `pmset`, and asks
-one line — `Quitting turns off Keep awake; next lid close sleeps.` — when
-anything is active. It unloads and removes the watchdog LaunchAgent before
-exiting.
+Use **Quit LidAwake** in Settings first when you can. It always reverts
+`pmset`, and asks one line — `Quitting turns off Keep awake; next lid close
+sleeps.` — when anything is active. It unloads and removes the watchdog
+LaunchAgent before exiting.
 
-After a successful Quit:
+To uninstall, run the script — it is safe from any state, including after a
+crash or force-quit:
 
 ```sh
-rm -rf /Applications/LidAwake.app /Applications/lid-awake.app ~/.lidawake ~/.lid-awake
+sudo bash packaging/uninstall.sh
+```
+
+Or by hand. **Order matters.** A crash or force-quit can strand
+`SleepDisabled=1` system-wide (a Mac that never sleeps, with no visible
+cause), so restore normal sleep FIRST; and boot the watchdog out before
+deleting the app, or KeepAlive respawn-loops on a missing binary:
+
+```sh
+sudo pmset -a disablesleep 0
+launchctl bootout "gui/$(id -u)/app.lidawake.guard" 2>/dev/null || true
+rm -f ~/Library/LaunchAgents/app.lidawake.guard.plist
+sudo rm -rf /Applications/LidAwake.app /Applications/lid-awake.app
+rm -rf ~/.lidawake ~/.lid-awake
 defaults delete app.lidawake 2>/dev/null || true
 defaults delete com.nempyxaa.lid-awake 2>/dev/null || true
 sudo rm -f /etc/sudoers.d/lidawake /etc/sudoers.d/lid-awake
+sudo pkgutil --forget app.lidawake.pkg 2>/dev/null || true
 ```
 
-The hyphenated paths and the `com.nempyxaa.lid-awake` domain only exist on
-machines upgraded from v2 or an earlier v3 build; the app migrates and
-removes them itself on first launch.
+The hyphenated paths, the `com.nempyxaa.lid-awake` domain, and the old-form
+LaunchAgents (`com.nempyxaa.lid-awake.guard`, `org.lidawake.guard`,
+`lv.fleet.lidguard` — the script removes those too) only exist on machines
+upgraded from v2 or an earlier v3 build; the app migrates and removes them
+itself on first launch.
 
 The current source build is ad-hoc signed. Developer ID signing and
 notarization are still release work.
