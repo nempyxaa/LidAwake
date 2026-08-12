@@ -1,0 +1,11 @@
+name: naming
+on:
+  push:
+  pull_request:
+jobs:
+  naming:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Keep awake proper-name and Lid Awake prose check
+        run: bash scripts/check-naming.sh

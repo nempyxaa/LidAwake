@@ -1,8 +1,29 @@
-# lid-awake
+# Lid Awake
 
-lid-awake is a native macOS menu-bar app that lets a MacBook keep working with its lid closed. On AC power it enables keep-awake automatically. On battery, you can make the override end when the lid opens, keep it through lid cycles until the battery floor or overheating, or choose the contract each time you turn it on. Plugging in power and manual shutoff always clear a battery override.
+Lid Awake is a native macOS menu-bar app that lets a MacBook keep working with
+its lid closed. **Keep awake** is the feature's name: on power the app keeps
+the Mac awake automatically (click the moon in the menu to decline); on
+battery you choose how Keep awake ends in Settings.
 
-The app supports macOS 13 and newer. Its menu and notices follow the Mac's language in English, German, French, Spanish, or Russian.
+Three battery modes, shown as radios under "On battery, Keep awake":
+
+1. **When turned on: until lid opens, 20%, or hot** — the default. A one-shot:
+   you click it, and it ends when you open the lid, hit the battery floor, or
+   the Mac runs hot.
+2. **When turned on: ignoring lid, until 20% or hot** — a one-shot that
+   survives lid opens; only the floor or heat ends it.
+3. **Always when on battery: until 20% or hot** — a standing policy: every lid
+   close on battery keeps the Mac awake, no click needed. The floor or heat
+   pause it; it resumes on its own at floor + 5% once thermals have been
+   nominal for five minutes. It survives reboots; one-shots do not.
+
+The percentages render live from the Battery floor setting (10–30%). Overheat
+protection is always on: the floor and heat always end Keep awake, and a
+forced sleep happens only while the lid is closed — an open, in-use Mac is
+never put to sleep.
+
+The full state diagram, transition rules, and an honest limitations list live
+in [docs/states.md](docs/states.md).
 
 ## Build
 
@@ -10,18 +31,31 @@ The app supports macOS 13 and newer. Its menu and notices follow the Mac's langu
 ./native/build.sh
 ```
 
-The build produces `native/build/lid-awake.app`, compiles and asserts both `arm64` and `x86_64`, applies an ad-hoc signature, verifies the bundle, and runs headless state-machine tests. It does not install or launch anything.
+The script runs `swift test` and a universal release `swift build` in
+`native/`, then produces the ad-hoc signed bundle at
+`native/build/LidAwake.app` and verifies both `arm64` and `x86_64`. It does
+not install or launch anything.
 
 ## Install
 
 1. Build the app.
-2. Move `native/build/lid-awake.app` to `/Applications`.
+2. Move `native/build/LidAwake.app` to `/Applications`.
 3. Add the sudoers rule below with `sudo visudo -f /etc/sudoers.d/lid-awake`.
-4. Open `/Applications/lid-awake.app`.
+4. Open `/Applications/LidAwake.app`.
 
-lid-awake refuses to register its login item or safety agent when run from a build or download directory. On first launch from `/Applications`, it installs a small per-user LaunchAgent. Every 60 seconds that agent runs the same binary with `--guard-tick`, so safety cleanup does not depend on the menu app staying alive.
+Alternatively, `packaging/build-pkg.sh` builds an installer package that does
+steps 2–4, deletes an old `lid-awake.app` from a v2 install, and installs the
+restricted sudoers rule for admin users.
 
-Every native launch also sweeps for v1 remnants by enumeration, not by expected names. It enumerates `~/Library/LaunchAgents` and unloads (`launchctl bootout`) and removes any lid-awake guard agent it finds — including `org.lidawake.guard` and `lv.fleet.lidguard` — along with the guard script each agent ran. It enumerates SwiftBar's configured plugin directory (and the legacy `~/.claude/swiftbar-plugins`) and removes lid plugins such as `lidawake.10s.sh` or `lid.10s.sh`, removes known v1 scripts from `~/.claude/hooks` and `~/.lid-awake`, and kills stray guard processes. Every removed file is first backed up under `~/.lid-awake/backups/`. The sweep then verifies by enumerating live state — `launchctl list`, the LaunchAgents directory, the plugin directories, and `pgrep` must show no v1 remnants — and logs any failure to `~/.lid-awake/state/lid-guard.log`; because the sweep runs on every launch, a failed verification retries next time. A notice is shown when legacy files were removed. Only one native menu app can run at a time.
+On first launch from `/Applications` the app installs its watchdog: a
+per-user KeepAlive LaunchAgent (`com.nempyxaa.lid-awake.guard`) that starts
+the app at login and relaunches it after a crash. Every launch reconciles
+`pmset` to the stored policy, deletes a leftover v2 `lid-awake.app` bundle,
+and sweeps v1 remnants by enumeration (agents, SwiftBar plugins, scripts —
+each removed file is first backed up under `~/.lid-awake/backups/`). Only one
+instance runs at a time.
+
+macOS 14.4 or newer.
 
 ## Permission
 
@@ -31,33 +65,56 @@ The app needs these exact privileged `pmset` commands:
 yourusername ALL=(root) NOPASSWD: /usr/bin/pmset -a disablesleep 0, /usr/bin/pmset -a disablesleep 1, /usr/bin/pmset -b lowpowermode 0, /usr/bin/pmset -b lowpowermode 1, /usr/bin/pmset sleepnow
 ```
 
-Replace `yourusername` with your macOS account name. If the rule is missing, the app presents the correct user-specific line with a copy button. Read the rule before installing it: it allows only the five command forms the app uses.
+Replace `yourusername` with your macOS account name. If the rule is missing,
+the app presents the correct user-specific line with a copy button. Read the
+rule before installing it: it allows only the five command forms the app uses.
 
 ## Safety behavior
 
-- On AC power, keep-awake turns on unless you manually switched it off.
-- On battery, you can arm an override only at least 5 percentage points above the chosen floor.
-- The override restores normal sleep according to the selected lid contract; low battery, AC connection, serious thermal pressure, and a guard gap longer than 420 seconds always restore it.
-- Every restore checks `SleepDisabled=0` before clearing persisted override state or sending an OFF notice. A failed restore keeps the retry state and tries again on the next 60-second tick, including on AC power.
-- The menu timer has a small tolerance and an App Nap activity assertion for UI freshness. The external LaunchAgent remains the safety authority.
+- The floor and heat always end Keep awake, in every mode. The forced sleep
+  runs only while the lid is closed; with the lid open the app disarms,
+  restores the default `pmset`, and notifies.
+- Plugging in never causes a sleep by itself. A one-shot held on power expires
+  after 30 minutes — except when automatic Keep awake is declined and the lid
+  is closed, where it survives until unplug. Unplugging re-checks the floor.
+- Arming needs battery at floor + 5% and five minutes of nominal thermals —
+  the same predicate that resumes the Always mode.
+- Every `pmset` restore is verified before policy state is cleared; a failed
+  write keeps the stored policy and the next tick retries.
+- Ends you did not cause (floor, heat, expiry, restart) leave a menu line:
+  `Last Keep awake: ended at N%, HH:MM`.
 
-The default battery floor is 20%. You can choose 10, 15, 20, 25, or 30%, select the standing battery contract, disable thermal auto-sleep, and mute notices from Settings.
-
-Thermal events are appended to `~/.lid-awake/state/thermal-history.txt`. Guard diagnostics go to `~/.lid-awake/state/lid-guard.log`.
+Thermal events append to `~/.lid-awake/state/thermal-history.txt`; guard
+diagnostics go to `~/.lid-awake/state/lid-guard.log`.
 
 ## Quit and uninstall
 
-Use **Quit** in the lid-awake menu first. It verifies that normal sleep is restored, disables Low Power Mode, unloads and removes the native safety LaunchAgent, unregisters the login item, and then exits. If sleep restoration fails, the app stays open and shows the permission fix.
+Use **Quit Lid Awake** in Settings first. It always reverts `pmset`, and asks
+one line — `Quitting turns off Keep awake; next lid close sleeps.` — when
+anything is active. It unloads and removes the watchdog LaunchAgent before
+exiting.
 
 After a successful Quit:
 
 ```sh
-rm -rf /Applications/lid-awake.app ~/.lid-awake
+rm -rf /Applications/LidAwake.app /Applications/lid-awake.app ~/.lid-awake
 defaults delete com.nempyxaa.lid-awake 2>/dev/null || true
 sudo rm /etc/sudoers.d/lid-awake
 ```
 
-The current source build is ad-hoc signed. Developer ID signing and notarization are still release work.
+The `/Applications/lid-awake.app` entry only exists on machines upgraded from
+v2; the app deletes it itself on first v3 launch.
+
+The current source build is ad-hoc signed. Developer ID signing and
+notarization are still release work.
+
+## Naming
+
+"Lid Awake" in prose; `lid-awake` only in code spans, paths, and identifiers
+(the repo, the bundle identifier `com.nempyxaa.lid-awake`, the brew cask
+token). The bundle on disk is `LidAwake.app` — no spaces in filenames. CI
+(`scripts/check-naming.sh`) greps prose for the lowercase name and for the
+banned terms; the tests enforce the same rule over every user-facing string.
 
 ## License
 
