@@ -1,24 +1,36 @@
 #!/bin/bash
-# lid-awake pkg postinstall. Runs as root after the payload lands in
-# /Library/Application Support/lid-awake. Sets up the sudoers rule, then
-# installs the per-user pieces for the console user.
+# lid-awake pkg postinstall. Runs as root after lid-awake.app lands in
+# /Applications. Installs the restricted per-user sudoers rule (README
+# "Permission" section) for the console user, then opens the app in their
+# session. Everything else — safety LaunchAgent, login item, v1 cleanup —
+# is done by the app itself on first launch.
+# A rule left by the v1 installer at the same path (broader: all of pmset
+# for %admin) is replaced by this restricted one.
 # Test hooks: LIDAWAKE_DESTDIR prefixes all write paths, LIDAWAKE_DRYRUN=1
 # prints actions instead of doing them.
 set -e
 
 D="${LIDAWAKE_DESTDIR:-}"
 DRY="${LIDAWAKE_DRYRUN:-0}"
-PAYLOAD="$D/Library/Application Support/lid-awake"
 
 run() {
   if [ "$DRY" = 1 ]; then echo "[dry-run] $*"; else "$@"; fi
 }
 
-# 1. Passwordless pmset for every admin user. %admin keeps the rule
-# username-agnostic. Validate before installing; never break sudo.
+CONSOLE_USER="$(stat -f%Su /dev/console 2>/dev/null || true)"
+case "$CONSOLE_USER" in
+  ""|root|loginwindow|_mbsetupuser)
+    echo "No console user detected. Add the sudoers rule from the README"
+    echo "(Permission section), then open /Applications/lid-awake.app."
+    exit 0 ;;
+esac
+
+# Only the five pmset command forms the app uses, only for this user.
+# Must stay in sync with sudoersLine in native/Sources/LidAwakeApp.swift.
+RULE="$CONSOLE_USER ALL=(root) NOPASSWD: /usr/bin/pmset -a disablesleep 0, /usr/bin/pmset -a disablesleep 1, /usr/bin/pmset -b lowpowermode 0, /usr/bin/pmset -b lowpowermode 1, /usr/bin/pmset sleepnow"
 SUDOERS="$D/etc/sudoers.d/lid-awake"
 TMP="$(mktemp)"
-echo "%admin ALL=(root) NOPASSWD: /usr/bin/pmset" > "$TMP"
+printf '%s\n' "$RULE" > "$TMP"
 if visudo -cf "$TMP" >/dev/null 2>&1; then
   run install -m 0440 -o root -g wheel "$TMP" "$SUDOERS"
 else
@@ -26,64 +38,11 @@ else
 fi
 rm -f "$TMP"
 
-# 2. Per-user setup for whoever is at the console.
-CONSOLE_USER="$(stat -f%Su /dev/console 2>/dev/null || true)"
-case "$CONSOLE_USER" in
-  ""|root|loginwindow|_mbsetupuser)
-    echo "No console user detected. Log in and run:"
-    echo "  \"$PAYLOAD/lid-awake-setup\""
-    exit 0 ;;
-esac
-USER_HOME="$(dscl . -read "/Users/$CONSOLE_USER" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
-USER_UID="$(id -u "$CONSOLE_USER")"
-if [ -z "$USER_HOME" ] || [ ! -d "$USER_HOME" ]; then
-  echo "Could not resolve home directory for $CONSOLE_USER; skipping per-user setup." >&2
-  exit 0
+# First launch from /Applications registers the LaunchAgent and login item
+# and sweeps v1 leftovers. Skipped under LIDAWAKE_DESTDIR (test install).
+if [ -z "$D" ]; then
+  USER_UID="$(id -u "$CONSOLE_USER")"
+  run launchctl asuser "$USER_UID" sudo -u "$CONSOLE_USER" open -a "/Applications/lid-awake.app" || true
 fi
-
-DEST="$D$USER_HOME/.lid-awake"
-run mkdir -p "$DEST/state"
-run cp "$PAYLOAD/lid-toggle.sh" "$PAYLOAD/lid-battery-guard.sh" "$PAYLOAD/lid-settings.sh" "$PAYLOAD/thermalstate" "$DEST/"
-run chmod +x "$DEST/lid-toggle.sh" "$DEST/lid-battery-guard.sh" "$DEST/lid-settings.sh" "$DEST/thermalstate"
-run xattr -dr com.apple.quarantine "$DEST" 2>/dev/null || true
-run chown -R "$CONSOLE_USER" "$DEST"
-
-# 3. SwiftBar plugin, if SwiftBar has a plugin folder configured.
-if [ "$(id -u)" = 0 ]; then
-  PLUGDIR="$(launchctl asuser "$USER_UID" sudo -u "$CONSOLE_USER" defaults read com.ameba.SwiftBar PluginDirectory 2>/dev/null || true)"
-else
-  PLUGDIR="$(defaults read com.ameba.SwiftBar PluginDirectory 2>/dev/null || true)"
-fi
-if [ -n "$PLUGDIR" ]; then
-  run cp "$PAYLOAD/lidawake.10s.sh" "$D$PLUGDIR/"
-  run chmod +x "$D$PLUGDIR/lidawake.10s.sh"
-  run chown "$CONSOLE_USER" "$D$PLUGDIR/lidawake.10s.sh"
-else
-  echo "SwiftBar is not configured yet. Install it (brew install --cask swiftbar),"
-  echo "launch it once, pick a plugin folder, then run:"
-  echo "  \"$PAYLOAD/lid-awake-setup\""
-fi
-
-# 4. LaunchAgent for the console user, loaded in their session.
-AGENTS="$D$USER_HOME/Library/LaunchAgents"
-PLIST="$AGENTS/org.lidawake.guard.plist"
-run mkdir -p "$AGENTS"
-if [ "$DRY" = 1 ]; then
-  echo "[dry-run] write LaunchAgent $PLIST (runs $USER_HOME/.lid-awake/lid-battery-guard.sh every 60s)"
-else
-  cat > "$PLIST" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-  <key>Label</key><string>org.lidawake.guard</string>
-  <key>ProgramArguments</key><array><string>$USER_HOME/.lid-awake/lid-battery-guard.sh</string></array>
-  <key>StartInterval</key><integer>60</integer>
-  <key>RunAtLoad</key><true/>
-</dict></plist>
-EOF
-fi
-run chown "$CONSOLE_USER" "$PLIST"
-run launchctl asuser "$USER_UID" sudo -u "$CONSOLE_USER" launchctl unload "$PLIST" 2>/dev/null || true
-run launchctl asuser "$USER_UID" sudo -u "$CONSOLE_USER" launchctl load "$PLIST"
 
 exit 0
