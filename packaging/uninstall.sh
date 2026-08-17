@@ -1,12 +1,13 @@
 #!/bin/bash
 # LidAwake uninstaller. Safe to run from ANY state — a clean Quit, a crash,
-# a force-quit, or a half-broken install. Every step is best-effort; the
-# one that matters most runs first.
+# a force-quit, or a half-broken install.
 #
 # Order matters: a crash or force-quit can strand SleepDisabled=1
 # system-wide (a Mac that never sleeps, with no visible cause), so normal
-# sleep is restored before anything else. The watchdog is booted out before
-# the app is deleted so KeepAlive cannot respawn-loop on a missing binary.
+# sleep is restored — and VERIFIED restored — before anything else. Only
+# that gate is allowed to stop the script; every later step is
+# best-effort. The watchdog is booted out before the app is deleted so
+# KeepAlive cannot respawn-loop on a missing binary.
 set -u
 
 # Root-safe: if invoked via `sudo`, re-run as the invoking user. As root,
@@ -20,7 +21,24 @@ if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]
 fi
 
 echo "Restoring normal sleep (needs your password once)…"
-sudo pmset -a disablesleep 0
+
+# J-02 gate: teardown may only begin after the restore command exits 0 AND
+# a readback confirms SleepDisabled=0. A failed or unverified restore must
+# not delete the app and its sudoers rule — they are the two convenient
+# recovery paths — and must not print a success message.
+restore_failed() {
+  echo "" >&2
+  echo "ERROR: could not verify that normal sleep was restored." >&2
+  echo "Nothing was removed. Restore sleep manually with:" >&2
+  echo "" >&2
+  echo "  sudo pmset -a disablesleep 0" >&2
+  echo "" >&2
+  echo "then re-run this uninstaller." >&2
+  exit 1
+}
+sudo pmset -a disablesleep 0 || restore_failed
+readback="$(pmset -g 2>/dev/null | awk '/SleepDisabled/ {print $NF}')"
+[ "$readback" = "0" ] || restore_failed
 
 # Watchdog first: bootout the guard job, then remove its plist.
 launchctl bootout "gui/$(id -u)/app.lidawake.guard" 2>/dev/null || true

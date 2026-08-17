@@ -123,12 +123,9 @@ stateDiagram-v2
 - Notifications are best-effort under Focus; the menu-bar icon, the menu
   headers, and the postmortem line are the primary channels.
 - One-shots die at reboot by design; only Always survives.
-- Keep awake on battery also turns on system Low Power Mode (the
-  `pmset -b lowpowermode` pair in the sudoers rule) to stretch the battery
-  while the lid is closed. When Keep awake ends, LidAwake restores the Low
-  Power Mode value you had before it armed — a snapshot taken at arm, never
-  a blind force-off. If you toggle LPM yourself mid-session, the restore
-  puts back the pre-arm value, not your mid-session change.
+- By default, Keep awake on battery also turns on system Low Power Mode. When
+  Keep awake ends, LidAwake restores the value saved at arm. If you turn this
+  setting off, LidAwake leaves Low Power Mode untouched.
 - Clamshell mode with an external display and power is governed by macOS
   itself; LidAwake does not add or remove that behavior.
 - No per-app awareness: the app does not know what your Mac is busy doing,

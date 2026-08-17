@@ -17,10 +17,13 @@ for TRIPLE in arm64-apple-macosx14.4 x86_64-apple-macosx14.4; do
 done
 BIN_ARM="$(swift build -c release --triple arm64-apple-macosx14.4 --show-bin-path)/LidAwake"
 BIN_X86="$(swift build -c release --triple x86_64-apple-macosx14.4 --show-bin-path)/LidAwake"
+RESOURCES="$(dirname "$BIN_ARM")/LidAwake_LidAwake.bundle"
 
 rm -rf "$APP" "$OUT/lid-awake.app"
 mkdir -p "$APP/Contents/MacOS"
+mkdir -p "$APP/Contents/Resources"
 cp "$NATIVE/Info.plist" "$APP/Contents/Info.plist"
+cp -R "$RESOURCES" "$APP/Contents/Resources/"
 xcrun lipo -create "$BIN_ARM" "$BIN_X86" -output "$APP/Contents/MacOS/LidAwake"
 
 codesign --force --deep --sign - "$APP"

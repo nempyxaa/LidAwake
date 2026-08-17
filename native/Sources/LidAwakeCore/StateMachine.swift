@@ -25,8 +25,12 @@ public enum BatteryMode: Int, Equatable, CaseIterable {
     public var isOneShot: Bool { self != .always }
 }
 
+public enum SettingsDefaults {
+    public static let useLowPowerMode = true
+}
+
 /// Ends the user did not cause; each one records the postmortem line.
-public enum EndCause: Equatable { case floor, hot, expiry, restart }
+public enum EndCause: Equatable { case floor, hot, expiry, restart, batteryUnavailable }
 
 public struct MachineSnapshot: Equatable {
     public var power: PowerSource
@@ -51,6 +55,7 @@ public struct MachineSnapshot: Equatable {
     /// Seconds a one-shot has been held on AC; nil when no hold clock runs.
     public var acHoldSeconds: TimeInterval?
     public var batteryFloor: Int
+    public var useLowPowerMode: Bool
 
     public init(power: PowerSource = .battery,
                 previousPower: PowerSource = .battery,
@@ -66,7 +71,8 @@ public struct MachineSnapshot: Equatable {
                 skipOnce: Bool = false,
                 alwaysPaused: Bool = false,
                 acHoldSeconds: TimeInterval? = nil,
-                batteryFloor: Int = 20) {
+                batteryFloor: Int = 20,
+                useLowPowerMode: Bool = SettingsDefaults.useLowPowerMode) {
         self.power = power
         self.previousPower = previousPower
         self.batteryPercent = batteryPercent
@@ -82,6 +88,7 @@ public struct MachineSnapshot: Equatable {
         self.alwaysPaused = alwaysPaused
         self.acHoldSeconds = acHoldSeconds
         self.batteryFloor = batteryFloor
+        self.useLowPowerMode = useLowPowerMode
     }
 }
 
@@ -91,6 +98,7 @@ public enum Notice: Equatable {
     case manualOff           // user turned Keep awake off
     case lidEnd              // mode 1 ended by a deliberate lid open
     case floorEnd(Int)       // one-shot ended at the battery floor
+    case batteryUnavailableEnd // ended: the battery percentage was unreadable
     case hotEnd              // ended by heat
     case floorPaused(Int)    // Always paused at the floor (payload: floor)
     case hotPaused           // Always paused by heat
@@ -122,6 +130,15 @@ public struct Decision: Equatable {
         self.effects = effects
         self.terminal = terminal
     }
+
+
+    public func respectingLowPowerModeSetting(_ snapshot: MachineSnapshot) -> Decision {
+        guard !snapshot.useLowPowerMode else { return self }
+        return Decision(effects: effects.filter {
+            if case .setLowPowerMode = $0 { return false }
+            return true
+        }, terminal: terminal)
+    }
 }
 
 public enum StateMachine {
@@ -140,11 +157,20 @@ public enum StateMachine {
         return percent >= floor + resumeMargin && thermalOKSeconds >= thermalCalmRequirement
     }
 
-    /// Floor hit = at or below the floor (an unreadable battery counts as hit).
+    /// Floor hit = at or below the floor. An unreadable battery is NOT a
+    /// floor hit — it is `batteryUnavailable`, a distinct condition (J-11).
+    /// Both refuse or end Keep awake (LidAwake is a laptop utility: no
+    /// readable percentage means no safety predicate), but they must never
+    /// be conflated in what the machine reports.
     public static func floorHit(percent: Int?, floor: Int) -> Bool {
-        guard let percent else { return true }
+        guard let percent else { return false }
         return percent <= floor
     }
+
+    /// The battery percentage cannot be read: pmset gave no percent. On a
+    /// desktop Mac this is permanent (documented laptop-only assumption);
+    /// on a MacBook it is a transient probe failure.
+    public static func batteryUnavailable(_ percent: Int?) -> Bool { percent == nil }
 
     // MARK: - Reconciling tick
 
@@ -170,6 +196,37 @@ public enum StateMachine {
 
         if unplugged {
             if s.oneShotActive {
+                // Safety terminators (lid open, heat, floor) are computed
+                // BEFORE the unplug-specific continue path (J-03/J-04): a
+                // lid open or thermal stop arriving in the same snapshot as
+                // the unplug must terminate here. The lid-open edge exists
+                // only in this snapshot — once the baselines advance it is
+                // gone, so swallowing it would leave the one-shot running
+                // until the floor or heat ends it.
+                if s.mode == .untilLidFloorHot && lidOpened {
+                    e += [.setSleepDisabled(false, verify: true), .setLowPowerMode(false),
+                          .setOneShot(false), .notify(.lidEnd), .log("one-shot ended (lid opened)")]
+                    return Decision(effects: e)
+                }
+                if hot {
+                    e += [.setSleepDisabled(false, verify: true), .setLowPowerMode(false),
+                          .setOneShot(false),
+                          .recordPostmortem(.hot), .notify(.hotEnd), .thermalHistory,
+                          .log("thermal end (thermalState=\(s.thermalState))")]
+                    // Lid-scoped safety invariant: forced sleep only with the lid closed.
+                    if s.lid == .closed {
+                        e.append(.sleepNow)
+                        return Decision(effects: e, terminal: true)
+                    }
+                    return Decision(effects: e)
+                }
+                if batteryUnavailable(s.batteryPercent) {
+                    e += [.setSleepDisabled(false, verify: true), .setLowPowerMode(false),
+                          .setOneShot(false),
+                          .recordPostmortem(.batteryUnavailable), .notify(.batteryUnavailableEnd),
+                          .log("one-shot ended on unplug (battery unavailable)")]
+                    return Decision(effects: e)
+                }
                 // On unplug: re-check the floor (at/below ends, else continue).
                 if floorHit(percent: s.batteryPercent, floor: s.batteryFloor) {
                     e += [.setSleepDisabled(false, verify: true), .setLowPowerMode(false),
@@ -234,6 +291,15 @@ public enum StateMachine {
                     e.append(.sleepNow)
                     return Decision(effects: e, terminal: true)
                 }
+                return Decision(effects: e)
+            }
+            if batteryUnavailable(s.batteryPercent) {
+                // No readable percentage, no floor predicate: the safe end,
+                // reported as its own condition, never as a floor hit (J-11).
+                e += [.setSleepDisabled(false, verify: true), .setLowPowerMode(false),
+                      .setOneShot(false),
+                      .recordPostmortem(.batteryUnavailable), .notify(.batteryUnavailableEnd),
+                      .log("one-shot ended (battery unavailable)")]
                 return Decision(effects: e)
             }
             if floorHit(percent: s.batteryPercent, floor: s.batteryFloor) {
@@ -344,9 +410,18 @@ public enum StateMachine {
                       .log("reconciled pmset to paused Always")]
             }
             if resumeReady(percent: s.batteryPercent, floor: s.batteryFloor, thermalOKSeconds: s.thermalOKSeconds) {
-                e += [.setSleepDisabled(true, verify: true), .setLowPowerMode(true),
-                      .setAlwaysPaused(false), .notify(.alwaysResumed),
-                      .log("Always Keep awake resumed")]
+                if skip {
+                    // J-05: an armed "Sleep on next lid close" survives the
+                    // pause. Resuming clears the pause only — suppression
+                    // and LPM stay off until a lid-close sleep consumes the
+                    // flag, or re-enabling would briefly break the promise.
+                    e += [.setAlwaysPaused(false), .notify(.alwaysResumed),
+                          .log("Always Keep awake resumed (one-time sleep armed)")]
+                } else {
+                    e += [.setSleepDisabled(true, verify: true), .setLowPowerMode(true),
+                          .setAlwaysPaused(false), .notify(.alwaysResumed),
+                          .log("Always Keep awake resumed")]
+                }
             }
             return Decision(effects: e)
         }
@@ -360,6 +435,15 @@ public enum StateMachine {
                 e.append(.sleepNow)
                 return Decision(effects: e, terminal: true)
             }
+            return Decision(effects: e)
+        }
+        if batteryUnavailable(s.batteryPercent) {
+            // Same pause as the floor (the resume predicate needs a
+            // readable percentage anyway), reported distinctly (J-11).
+            e += [.setSleepDisabled(false, verify: true), .setLowPowerMode(false),
+                  .setAlwaysPaused(true),
+                  .recordPostmortem(.batteryUnavailable), .notify(.floorPaused(s.batteryFloor)),
+                  .log("Always Keep awake paused (battery unavailable)")]
             return Decision(effects: e)
         }
         if floorHit(percent: s.batteryPercent, floor: s.batteryFloor) {
@@ -404,6 +488,11 @@ public enum StateMachine {
             ])
         }
         guard s.mode.isOneShot, !s.oneShotActive else { return Decision() }
+        // An unreadable battery refuses arming — with no percentage the
+        // floor predicate cannot protect the session (J-11, laptop-only).
+        guard !batteryUnavailable(s.batteryPercent) else {
+            return Decision(effects: [.log("arm refused (battery unavailable)")])
+        }
         // Spec: arming is disabled only at/below the floor or while hot. The
         // resume predicate (floor + 5, five calm minutes) gates resumption,
         // not arming.

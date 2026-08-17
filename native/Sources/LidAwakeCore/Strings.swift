@@ -56,6 +56,9 @@ public enum V3Strings {
         "Battery at or below \(floor)%"
     }
     public static let armDisabledHot = "Cooling down"
+    /// J-11: an unreadable battery (a desktop Mac, or a failed probe) is
+    /// its own state — never presented as a floor hit.
+    public static let armDisabledNoBattery = "Battery unavailable"
     public static let turnOff = "Turn off Keep awake"
     /// Subtitle on the moon item in the on-power idle menu (D2): the decline
     /// is standing on power, so the item says so.
@@ -77,6 +80,8 @@ public enum V3Strings {
         "\(value)% — ends current Keep awake"
     }
     public static let modeSection = "On battery, Keep awake"
+    public static let lpmSetting = "Use Low Power Mode while Keep awake is on"
+    public static let lpmSettingSubtitle = "Your setting comes back when it ends"
     public static func modeRadioUntilLid(_ floor: Int) -> String {
         "When turned on: until lid opens, \(floor)%, or hot"
     }
@@ -99,6 +104,7 @@ public enum V3Strings {
         "Keep awake ended: battery at \(percent)%."
     }
     public static let notifyHotEnd = "Keep awake ended: cooling down."
+    public static let notifyBatteryUnavailable = "Keep awake ended: battery unavailable."
     public static func notifyFloorPaused(_ floor: Int) -> String {
         "Keep awake paused: resumes at \(floor + StateMachine.resumeMargin)%."
     }
@@ -117,15 +123,17 @@ public enum V3Strings {
          untilOneShotLid(floor), untilOneShotIgnoringLid(floor), alwaysUntil(floor),
          pausedFloor(floor), pausedHot, postmortem(18, "14:05"),
          armItem, armSubUntilLid(floor), armSubIgnoringLid(floor), armSubChangeMode,
-         armSubOnPower, armDisabledLow(floor), armDisabledHot,
+         armSubOnPower, armDisabledLow(floor), armDisabledHot, armDisabledNoBattery,
          turnOff, turnOffOnPowerSub, sleepNow, sleepNowSubOneShot,
          skipOnceItem, skipOnceSub, skipOnceArmedItem,
          turnOffAlwaysItem, turnOffAlwaysSub, settings,
          showNotifications, floorItem(floor), floorOption(floor), floorOptionEndsCurrent(floor),
-         modeSection, modeRadioUntilLid(floor), modeRadioIgnoringLid(floor), modeRadioAlways(floor),
+         modeSection, lpmSetting, lpmSettingSubtitle,
+         modeRadioUntilLid(floor), modeRadioIgnoringLid(floor), modeRadioAlways(floor),
          about, quit, quitConfirm,
          notifyACOn, notifyBatteryOff, notifyManualOff, notifyLidEnd,
-         notifyFloorEnd(floor), notifyHotEnd, notifyFloorPaused(floor), notifyHotPaused,
+         notifyFloorEnd(floor), notifyHotEnd, notifyBatteryUnavailable,
+         notifyFloorPaused(floor), notifyHotPaused,
          notifyAlwaysResumed, notifyACExpired, notifyOverheatInvariant,
          notifyFailure, notifyRevertFailure]
     }
