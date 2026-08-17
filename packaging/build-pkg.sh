@@ -5,7 +5,7 @@
 # any filename; lowercase identifiers use "lidawake" with no hyphen.
 set -e
 cd "$(dirname "$0")/.."
-VERSION="${1:-3.0.0}"
+VERSION="${1:-3.1.0}"
 BUILD="$(mktemp -d)"
 trap 'rm -rf "$BUILD"' EXIT
 
