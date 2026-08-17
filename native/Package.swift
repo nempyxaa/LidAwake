@@ -9,7 +9,7 @@ let package = Package(
                 swiftSettings: [.swiftLanguageMode(.v5)]),
         .executableTarget(name: "LidAwake", dependencies: ["LidAwakeCore"], path: "Sources/LidAwake",
                           swiftSettings: [.swiftLanguageMode(.v5)]),
-        .testTarget(name: "LidAwakeTests", dependencies: ["LidAwakeCore"], path: "Tests/LidAwakeTests",
+        .testTarget(name: "LidAwakeTests", dependencies: ["LidAwakeCore", "LidAwake"], path: "Tests/LidAwakeTests",
                     swiftSettings: [.swiftLanguageMode(.v5)]),
     ]
 )

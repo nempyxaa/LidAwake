@@ -15,13 +15,15 @@ private func snap(power: PowerSource = .battery,
                   skip: Bool = false,
                   paused: Bool = false,
                   hold: Double? = nil,
-                  floor: Int = 20) -> MachineSnapshot {
+                  floor: Int = 20,
+                  useLowPowerMode: Bool = SettingsDefaults.useLowPowerMode) -> MachineSnapshot {
     MachineSnapshot(power: power, previousPower: prevPower ?? power,
                     batteryPercent: battery, lid: lid, previousLid: prevLid ?? lid,
                     thermalState: thermal, thermalOKSeconds: thermalOK,
                     sleepDisabled: disabled, mode: mode, oneShotActive: oneShot,
                     acDeclined: declined, skipOnce: skip, alwaysPaused: paused,
-                    acHoldSeconds: hold, batteryFloor: floor)
+                    acHoldSeconds: hold, batteryFloor: floor,
+                    useLowPowerMode: useLowPowerMode)
 }
 
 private extension Decision {
@@ -31,6 +33,40 @@ private extension Decision {
     var endsOneShot: Bool { effects.contains(.setOneShot(false)) }
     var postmortems: [EndCause] {
         effects.compactMap { if case let .recordPostmortem(c) = $0 { return c } else { return nil } }
+    }
+}
+
+@Suite struct LowPowerModeSettingTests {
+    @Test func defaultsOn() {
+        #expect(SettingsDefaults.useLowPowerMode)
+        #expect(snap().useLowPowerMode)
+    }
+
+    @Test func offLeavesLowPowerModeUntouchedAcrossArmEndAndFloorHit() {
+        let armSnapshot = snap(useLowPowerMode: false)
+        let arm = StateMachine.arm(armSnapshot).respectingLowPowerModeSetting(armSnapshot)
+        #expect(arm.enables)
+        #expect(!arm.effects.contains { if case .setLowPowerMode = $0 { true } else { false } })
+
+        let endSnapshot = snap(disabled: true, oneShot: true, useLowPowerMode: false)
+        let end = StateMachine.turnOffOneShot(endSnapshot).respectingLowPowerModeSetting(endSnapshot)
+        #expect(end.restoresDefault)
+        #expect(!end.effects.contains { if case .setLowPowerMode = $0 { true } else { false } })
+
+        let floorSnapshot = snap(battery: 20, lid: .closed, disabled: true,
+                                 oneShot: true, useLowPowerMode: false)
+        let floor = StateMachine.tick(floorSnapshot).respectingLowPowerModeSetting(floorSnapshot)
+        #expect(floor.endsOneShot)
+        #expect(!floor.effects.contains { if case .setLowPowerMode = $0 { true } else { false } })
+    }
+
+    @Test func onPathIsUnchanged() {
+        let armSnapshot = snap()
+        #expect(StateMachine.arm(armSnapshot).effects.contains(.setLowPowerMode(true)))
+        let endSnapshot = snap(disabled: true, oneShot: true)
+        #expect(StateMachine.turnOffOneShot(endSnapshot).effects.contains(.setLowPowerMode(false)))
+        let floorSnapshot = snap(battery: 20, lid: .closed, disabled: true, oneShot: true)
+        #expect(StateMachine.tick(floorSnapshot).effects.contains(.setLowPowerMode(false)))
     }
 }
 
@@ -80,9 +116,15 @@ private extension Decision {
         #expect(hot.postmortems == [.hot])
     }
 
-    @Test func unreadableBatteryCountsAsFloorHit() {
+    @Test func unavailableBatteryEndsOneShotAsItsOwnCondition() {
+        // J-11: no readable percentage still ends the one-shot (the floor
+        // predicate is blind without it — laptop-only assumption), but it
+        // is reported as batteryUnavailable, never as a floor hit.
         let d = StateMachine.tick(snap(battery: nil, lid: .closed, disabled: true, oneShot: true))
         #expect(d.endsOneShot)
+        #expect(d.effects.contains(.notify(.batteryUnavailableEnd)))
+        #expect(d.postmortems == [.batteryUnavailable])
+        #expect(!d.effects.contains(.notify(.floorEnd(0))), "not presented as a floor end")
     }
 
     @Test func floorAboveBatteryAfterFloorChangeEndsCurrent() {
@@ -323,6 +365,63 @@ private extension Decision {
     }
 }
 
+// MARK: - Paired unplug transitions (J-03 / J-04)
+
+@Suite struct UnplugPairedTransitionTests {
+    @Test func mode1UnplugWithLidOpenEndsOneShot() {
+        // J-04: the lid-open edge exists only in the unplug snapshot — the
+        // baselines advance after this tick, so it must terminate NOW or
+        // the mode-1 contract is lost until floor/heat.
+        let d = StateMachine.tick(snap(power: .battery, prevPower: .ac, battery: 60,
+                                       lid: .open, prevLid: .closed, disabled: true,
+                                       mode: .untilLidFloorHot, oneShot: true, hold: 300))
+        #expect(d.endsOneShot)
+        #expect(d.restoresDefault)
+        #expect(d.effects.contains(.notify(.lidEnd)))
+        #expect(d.postmortems.isEmpty, "a deliberate lid open records no postmortem")
+        #expect(!d.sleeps)
+        #expect(d.effects.contains(.setACHold(false)), "the AC hold clock dies on unplug")
+    }
+
+    @Test func mode2UnplugWithLidOpenContinues() {
+        let d = StateMachine.tick(snap(power: .battery, prevPower: .ac, battery: 60,
+                                       lid: .open, prevLid: .closed, disabled: true,
+                                       mode: .ignoringLid, oneShot: true, hold: 300))
+        #expect(!d.endsOneShot, "mode 2 ignores the lid — on unplug too")
+        #expect(!d.restoresDefault)
+        #expect(d.effects.contains(.setLowPowerMode(true)))
+    }
+
+    @Test func unplugWithHotEndsOneShotInBothModesAndEitherLid() {
+        // J-03: a thermal stop arriving in the unplug snapshot must not
+        // wait for the next tick — the one-shot ends in this decision.
+        for mode in [BatteryMode.untilLidFloorHot, .ignoringLid] {
+            for lid in [LidState.open, .closed] {
+                let d = StateMachine.tick(snap(power: .battery, prevPower: .ac, battery: 60,
+                                               lid: lid, thermal: 3, disabled: true,
+                                               mode: mode, oneShot: true, hold: 300))
+                #expect(d.endsOneShot, "mode \(mode) lid \(lid)")
+                #expect(d.restoresDefault, "mode \(mode) lid \(lid)")
+                #expect(d.postmortems == [.hot], "mode \(mode) lid \(lid)")
+                #expect(d.effects.contains(.notify(.hotEnd)), "mode \(mode) lid \(lid)")
+                #expect(d.sleeps == (lid == .closed),
+                        "forced sleep only with the lid closed (mode \(mode) lid \(lid))")
+            }
+        }
+    }
+
+    @Test func unplugWithHotOutranksFloorContinue() {
+        // Heat and a healthy battery in the same unplug snapshot: the
+        // one-shot must end hot, not continue on battery.
+        let d = StateMachine.tick(snap(power: .battery, prevPower: .ac, battery: 90,
+                                       lid: .closed, thermal: 2, disabled: true,
+                                       mode: .ignoringLid, oneShot: true))
+        #expect(d.endsOneShot)
+        #expect(d.postmortems == [.hot])
+        #expect(!d.effects.contains(.setLowPowerMode(true)), "no LPM turn-on in a hot end")
+    }
+}
+
 // MARK: - Resume predicate hysteresis
 
 @Suite struct ResumePredicateTests {
@@ -359,7 +458,7 @@ private extension Decision {
         #expect(StateMachine.arm(snap(battery: 22)).enables,
                 "between floor and floor + 5 arming is allowed")
         #expect(!StateMachine.arm(snap(battery: 20)).enables, "at the floor")
-        #expect(!StateMachine.arm(snap(battery: nil)).enables, "unreadable battery counts as hit")
+        #expect(!StateMachine.arm(snap(battery: nil)).enables, "unreadable battery refuses arming")
         #expect(!StateMachine.arm(snap(battery: 80, thermal: 2)).enables, "while hot")
         #expect(StateMachine.arm(snap(battery: 80, thermalOK: 100)).enables,
                 "a recent thermal blip does not block arming once cooled")
@@ -418,6 +517,22 @@ private extension Decision {
         #expect(cancel.effects.contains(.setSkipOnce(false)))
     }
 
+    @Test func resumeFromPauseHonorsArmedSkipOnce() {
+        // J-05: resuming a paused Always with skip-once armed must not
+        // re-enable sleep suppression or LPM — the next lid close sleeps.
+        let d = StateMachine.tick(snap(battery: 60, mode: .always, skip: true, paused: true))
+        #expect(d.effects.contains(.setAlwaysPaused(false)))
+        #expect(d.effects.contains(.notify(.alwaysResumed)))
+        #expect(!d.enables, "the promised one-time sleep survives the resume")
+        #expect(!d.effects.contains(.setLowPowerMode(true)))
+        #expect(!d.effects.contains(.setSkipOnce(false)), "only a lid-close sleep consumes the flag")
+        // The follow-up tick (pause cleared, skip still armed) keeps
+        // suppression off and waits for the lid close.
+        let next = StateMachine.tick(snap(battery: 60, mode: .always, skip: true))
+        #expect(!next.enables)
+        #expect(!next.effects.contains(.setLowPowerMode(true)))
+    }
+
     @Test func unplugHonorsArmedSkipOnce() {
         let d = StateMachine.tick(snap(power: .battery, prevPower: .ac, battery: 60,
                                        disabled: true, mode: .always, skip: true))
@@ -452,6 +567,35 @@ private extension Decision {
         let d = StateMachine.turnOffAlways(snap(disabled: true, mode: .always))
         #expect(d.restoresDefault)
         #expect(d.effects.contains(.setSkipOnce(false)))
+    }
+}
+
+// MARK: - Battery unavailable is its own condition (J-11)
+
+@Suite struct BatteryUnavailableTests {
+    @Test func unavailableIsDistinctFromFloorHit() {
+        #expect(StateMachine.batteryUnavailable(nil))
+        #expect(!StateMachine.batteryUnavailable(50))
+        #expect(!StateMachine.floorHit(percent: nil, floor: 20), "nil is not a floor hit")
+        #expect(StateMachine.floorHit(percent: 20, floor: 20))
+        #expect(!StateMachine.resumeReady(percent: nil, floor: 20, thermalOKSeconds: 1_000_000),
+                "no resume without a readable percentage")
+    }
+
+    @Test func unplugWithUnavailableBatteryEndsDistinctly() {
+        let d = StateMachine.tick(snap(power: .battery, prevPower: .ac, battery: nil,
+                                       lid: .closed, disabled: true, oneShot: true, hold: 300))
+        #expect(d.endsOneShot)
+        #expect(d.effects.contains(.notify(.batteryUnavailableEnd)))
+        #expect(d.postmortems == [.batteryUnavailable])
+    }
+
+    @Test func alwaysPausesOnUnavailableBattery() {
+        let d = StateMachine.tick(snap(battery: nil, lid: .closed, disabled: true, mode: .always))
+        #expect(d.effects.contains(.setAlwaysPaused(true)))
+        #expect(d.restoresDefault)
+        #expect(d.postmortems == [.batteryUnavailable])
+        #expect(!d.sleeps)
     }
 }
 
@@ -575,6 +719,7 @@ private extension Decision {
         #expect(V3Strings.armSubOnPower == "On power: Keep awake automatically")
         #expect(V3Strings.armDisabledLow(20) == "Battery at or below 20%")
         #expect(V3Strings.armDisabledHot == "Cooling down")
+        #expect(V3Strings.armDisabledNoBattery == "Battery unavailable")
         #expect(V3Strings.turnOff == "Turn off Keep awake")
         #expect(V3Strings.turnOffOnPowerSub == "Stays off on power until you turn it back on")
         #expect(V3Strings.sleepNowSubOneShot == "Sleeps and turns Keep awake off")
@@ -584,6 +729,8 @@ private extension Decision {
         #expect(V3Strings.turnOffAlwaysItem == "Turn off Always Keep awake")
         #expect(V3Strings.turnOffAlwaysSub == "Keep awake only when you click it")
         #expect(V3Strings.modeSection == "On battery, Keep awake")
+        #expect(V3Strings.lpmSetting == "Use Low Power Mode while Keep awake is on")
+        #expect(V3Strings.lpmSettingSubtitle == "Your setting comes back when it ends")
         #expect(V3Strings.modeRadioUntilLid(20) == "When turned on: until lid opens, 20%, or hot")
         #expect(V3Strings.modeRadioIgnoringLid(20) == "When turned on: ignoring lid, until 20% or hot")
         #expect(V3Strings.modeRadioAlways(20) == "Always when on battery: until 20% or hot")
@@ -597,6 +744,7 @@ private extension Decision {
         #expect(V3Strings.notifyBatteryOff ==
                 "On battery: Keep awake off, the lid sleeps the Mac as usual.")
         #expect(V3Strings.notifyOverheatInvariant == "Overheat protection is now always on")
+        #expect(V3Strings.notifyBatteryUnavailable == "Keep awake ended: battery unavailable.")
         #expect(V3Strings.floorOptionEndsCurrent(30) == "30% — ends current Keep awake")
     }
 

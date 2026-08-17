@@ -31,6 +31,11 @@ real screenshots replace them post-build.
 
 - macOS 14.4 or newer (Apple silicon or Intel; the app menu uses
   `NSMenuItem.subtitle`).
+- A MacBook. LidAwake is a laptop utility: the battery percentage is a
+  safety input to every mode. When no percentage is readable (a desktop
+  Mac, or a failed probe on a MacBook), arming is refused and a running
+  Keep awake ends, reported as `Battery unavailable` — a distinct
+  condition, not a floor hit.
 - To build: the Swift 6 toolchain — Xcode 16, or the Command Line Tools 16
   or newer. No full Xcode needed.
 
@@ -92,10 +97,10 @@ Replace `yourusername` with your macOS account name. If the rule is missing,
 the app presents the correct user-specific line with a copy button. Read the
 rule before installing it: it allows only the five command forms the app uses.
 
-The `lowpowermode` pair is there because Keep awake on battery also turns on
-system Low Power Mode to stretch the battery while the lid is closed. When
-Keep awake ends, the app restores the Low Power Mode value you had before it
-armed — a snapshot taken at arm, never a blind force-off.
+The `lowpowermode` pair supports the default setting that turns on system Low
+Power Mode while Keep awake is active on battery. When Keep awake ends, the
+app restores the value you had before it armed. You can turn this setting off;
+LidAwake then leaves Low Power Mode untouched.
 
 ## Safety behavior
 
