@@ -23,7 +23,13 @@ rm -rf "$APP" "$OUT/lid-awake.app"
 mkdir -p "$APP/Contents/MacOS"
 mkdir -p "$APP/Contents/Resources"
 cp "$NATIVE/Info.plist" "$APP/Contents/Info.plist"
-cp -R "$RESOURCES" "$APP/Contents/Resources/"
+# SwiftPM emits LidAwake_LidAwake.bundle only when Package.swift declares
+# resources for the LidAwake target; since the v3.1 squash dropped the draft
+# localizations there is none on a clean build. Copy it only if present, so
+# clean checkouts (CI) don't fail on a bundle that a stale .build/ still has.
+if [ -d "$RESOURCES" ]; then
+  cp -R "$RESOURCES" "$APP/Contents/Resources/"
+fi
 xcrun lipo -create "$BIN_ARM" "$BIN_X86" -output "$APP/Contents/MacOS/LidAwake"
 
 codesign --force --deep --sign - "$APP"
