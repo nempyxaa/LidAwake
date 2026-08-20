@@ -24,6 +24,15 @@ extension AppDelegate {
 
     func checkStatusItemVisibility() {
         guard !headless else { return } // no status item exists to probe
+        // A sleeping display draws nothing: every status item reads as
+        // occluded, which says nothing about overflow. Skip the reading —
+        // freezing the episode machine — rather than feed it a
+        // meaningless one. Observed live 20.08.2026: display sleep at
+        // 18:38:47 produced a false "hidden by menu bar overflow"
+        // notification two ticks later. (Fullscreen needs no such guard
+        // on notch Macs — the menu bar stays drawn, verified empirically
+        // via the window list during a fullscreen session.)
+        guard CGDisplayIsAsleep(CGMainDisplayID()) == 0 else { return }
         switch iconVisibility.observe(visible: statusItemOnScreen) {
         case .becameHidden:
             // The armed state rides along in the body: with the menu
