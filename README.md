@@ -126,6 +126,13 @@ LidAwake then leaves Low Power Mode untouched.
 Thermal events append to `~/.lidawake/state/thermal-history.txt`; guard
 diagnostics go to `~/.lidawake/state/lid-guard.log`.
 
+Since 3.2, every event also lands in `~/Library/Logs/LidAwake/events.log`
+(rotated at 1 MB to `events.log.1`): launch and exit with the app version, a
+`pmset` anchor line at launch (`SleepDisabled`, power source, battery), every
+arm and disarm with its verified `pmset` result, and system sleep/wake
+transitions. When you need to know what Keep awake believed at the moment the
+lid closed, read the `system willSleep` line there.
+
 ## Quit and uninstall
 
 Use **Quit LidAwake** in Settings first when you can. It always reverts
