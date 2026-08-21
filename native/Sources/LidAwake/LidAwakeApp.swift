@@ -89,6 +89,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var headless = false
     private var postmortemDisplayed = false
 
+    static var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = status // create the status item (with its placeholder icon) FIRST
         migrateStateDirectory()
@@ -96,6 +100,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         registerDefaults()
         migrateOldIdentifierDomain()
         migrateV2Defaults()
+        logEvent("launch v\(Self.appVersion) (pid \(ProcessInfo.processInfo.processIdentifier))")
+        logPmsetAnchor()
         status.menu = NSMenu(); status.menu?.delegate = self
         requestNotificationsIfNeeded()
         configurePersistentServices()
@@ -111,6 +117,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                               name: NSWorkspace.willSleepNotification, object: nil)
         workspace.addObserver(self, selector: #selector(systemDidWake),
                               name: NSWorkspace.didWakeNotification, object: nil)
+        workspace.addObserver(self, selector: #selector(screensDidSleep),
+                              name: NSWorkspace.screensDidSleepNotification, object: nil)
+        workspace.addObserver(self, selector: #selector(screensDidWake),
+                              name: NSWorkspace.screensDidWakeNotification, object: nil)
         activity = ProcessInfo.processInfo.beginActivity(options: AppActivity.options, reason: AppActivity.reason)
         // J-07: validate ALL five privileged command forms, not just one —
         // a partial sudoers rule must surface at startup, with the full
@@ -193,7 +203,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: Actions
 
-    @objc func armClicked() { act { StateMachine.arm($0) } }
+    @objc func armClicked() {
+        // The arm click carries its power context into the event log: the
+        // 15:28 question ("was Keep awake armed, and on what power?") must
+        // be answerable from this line plus the result line that follows.
+        let s = snapshot()
+        logEvent("arm clicked (power=\(label(s.power)), battery=\(label(s.batteryPercent)), "
+            + "mode=\(s.mode.rawValue + 1), SleepDisabled pre=\(s.sleepDisabled ? "1" : "0"))")
+        _ = execute(StateMachine.arm(s), snapshot: s)
+        refreshMenu()
+    }
     @objc func declineClicked() { act { StateMachine.declineOnPower($0) } }
     @objc func turnOffClicked() { act { StateMachine.turnOffOneShot($0) } }
     @objc func skipOnceClicked() { act { StateMachine.toggleSkipOnce($0) } }
@@ -238,9 +257,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func systemWillSleep() {
         let s = snapshot()
+        // THE adjudication line: at the moment the system commits to sleep,
+        // record what Keep awake believed and what pmset actually held.
+        logEvent("system willSleep (lid=\(s.lid.rawValue), power=\(label(s.power)), "
+            + "battery=\(label(s.batteryPercent)), SleepDisabled=\(s.sleepDisabled ? "1" : "0"), "
+            + "oneShot=\(s.oneShotActive), mode=\(s.mode.rawValue + 1), alwaysPaused=\(s.alwaysPaused))")
         _ = execute(StateMachine.systemWillSleep(s), snapshot: s)
     }
-    @objc private func systemDidWake() { tick() }
+    @objc private func systemDidWake() {
+        logEvent("system didWake")
+        tick()
+    }
+    @objc private func screensDidSleep() { logEvent("screens did sleep") }
+    @objc private func screensDidWake() { logEvent("screens did wake") }
+
+    private func label(_ power: PowerSource) -> String { power == .ac ? "AC" : "battery" }
+    private func label(_ percent: Int?) -> String { percent.map { "\($0)%" } ?? "?" }
 
     // MARK: Effect executor
 
@@ -273,6 +305,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         return false
                     }
                     failureStreakNotified = false
+                    appendLog("pmset SleepDisabled=\(value ? "1" : "0") verified")
+                } else {
+                    appendLog("pmset SleepDisabled=\(value ? "1" : "0") write status \(writeStatus) (unverified)")
                 }
             case let .setLowPowerMode(value):
                 // Snapshot-and-restore (decision D3): remember the user's own
@@ -349,11 +384,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
+        logEvent("quit clicked (menu; Keep awake reverts)")
         guard execute(StateMachine.quitCleanup(), snapshot: s) else { return }
         unloadGuardAgent(removeFile: true)
         if SMAppService.mainApp.status == .enabled { try? SMAppService.mainApp.unregister() }
         if let activity { ProcessInfo.processInfo.endActivity(activity) }
         NSApp.terminate(nil)
+    }
+
+    /// Fires on every NSApp.terminate path (menu quit, single-instance
+    /// yield, guard-agent handoff). A missing exit line next to a later
+    /// launch line is itself forensic signal: the process died without
+    /// AppKit teardown — a crash or a kill.
+    func applicationWillTerminate(_ notification: Notification) {
+        logEvent("exit v\(Self.appVersion) (pid \(ProcessInfo.processInfo.processIdentifier))")
     }
 
     // MARK: Probes
@@ -390,13 +434,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
     /// Tests point this at a scratch directory so log writes never touch
-    /// the real ~/.lidawake state.
+    /// the real ~/.lidawake state (the event log follows the same override).
     var stateDirectoryOverride: URL?
     private func stateDirectory() -> URL {
         stateDirectoryOverride
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".lidawake/state", isDirectory: true)
     }
-    func appendLog(_ message: String) { append("\(stamp()) \(message)\n", to: "lid-guard.log") }
+    /// The v3.2 event log under ~/Library/Logs/LidAwake — the standard
+    /// place a post-incident reader looks first (issue #5).
+    var events: EventLog { EventLog(directory: stateDirectoryOverride ?? EventLog.defaultDirectory) }
+    /// App-lifecycle and sleep/wake events: event log only.
+    func logEvent(_ message: String) { events.append(message) }
+    /// State-machine and pmset lines: both the event log and the legacy
+    /// diagnostic trail in ~/.lidawake/state/lid-guard.log.
+    func appendLog(_ message: String) {
+        append("\(stamp()) \(message)\n", to: "lid-guard.log")
+        events.append(message)
+    }
+    /// The launch forensics anchor: whatever else a session's log misses,
+    /// every launch pins the live pmset truth (pmset -g parse) so the
+    /// reader starts from a known SleepDisabled value.
+    func logPmsetAnchor() {
+        let sd = power.readSleepDisabled()
+        logEvent("pmset anchor: SleepDisabled=\(sd.map { $0 ? "1" : "0" } ?? "unknown"), "
+            + "power=\(label(power.powerSource())), battery=\(label(power.batteryPercent()))")
+    }
     private func appendThermalHistory() { append("\(stamp()) thermal force-sleep\n", to: "thermal-history.txt") }
     private func append(_ text: String, to name: String) {
         let dir = stateDirectory(); try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
