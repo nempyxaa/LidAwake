@@ -81,6 +81,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var notificationSink: ((String) -> Void)?
     private var timer: Timer?
     var permissionAlertShown = false
+    /// Menu bar overflow episode tracker (#4); the pure logic lives in
+    /// LidAwakeCore, the probe and wiring in StatusItemVisibility.swift.
+    var iconVisibility = IconVisibility()
     /// One notification per failure streak: without the sudoers rule the
     /// 60-second tick would otherwise notify forever. The per-tick log line
     /// stays; the streak resets on the first verified write that succeeds.
@@ -122,6 +125,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         workspace.addObserver(self, selector: #selector(screensDidWake),
                               name: NSWorkspace.screensDidWakeNotification, object: nil)
         activity = ProcessInfo.processInfo.beginActivity(options: AppActivity.options, reason: AppActivity.reason)
+        // #4: a display change can push the status item into (or out of)
+        // menu bar overflow the moment it happens — check right then, not
+        // only on the next tick.
+        NotificationCenter.default.addObserver(self, selector: #selector(screenParametersChanged),
+                                               name: NSApplication.didChangeScreenParametersNotification,
+                                               object: nil)
         // J-07: validate ALL five privileged command forms, not just one —
         // a partial sudoers rule must surface at startup, with the full
         // repair line in the alert, not as a runtime failure later.
@@ -199,6 +208,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let percent = s.batteryPercent { state.lastPercent = percent }
         state.lastTickAt = Date()
         if refresh { refreshMenu() }
+        checkStatusItemVisibility()
     }
 
     // MARK: Actions

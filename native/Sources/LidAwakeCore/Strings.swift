@@ -115,6 +115,16 @@ public enum V3Strings {
     public static let notifyFailure = "Could not turn on Keep awake: pmset needs the passwordless sudo rule (see README). Nothing changed."
     public static let notifyRevertFailure = "Could not restore normal sleep. LidAwake will retry in 60 seconds."
 
+    // MARK: Icon visibility (#4)
+    /// The armed state rides along in the hidden-icon notification: with
+    /// the menu unreachable, it is the only way to trust Keep awake.
+    public static let iconHiddenKeepAwakeOn = "Keep awake is on."
+    public static let iconHiddenKeepAwakeOff = "Keep awake is off."
+    public static func notifyIconHidden(_ state: String) -> String {
+        "LidAwake is running but its icon is hidden by menu bar overflow. \(state)"
+    }
+    public static let notifyIconBack = "The LidAwake icon is back in the menu bar."
+
     /// Every canonical string, rendered for a given floor — used by the tests
     /// to enforce the proper-name rule mechanically.
     public static func allStrings(floor: Int) -> [String] {
@@ -135,6 +145,8 @@ public enum V3Strings {
          notifyFloorEnd(floor), notifyHotEnd, notifyBatteryUnavailable,
          notifyFloorPaused(floor), notifyHotPaused,
          notifyAlwaysResumed, notifyACExpired, notifyOverheatInvariant,
-         notifyFailure, notifyRevertFailure]
+         notifyFailure, notifyRevertFailure,
+         iconHiddenKeepAwakeOn, iconHiddenKeepAwakeOff,
+         notifyIconHidden(iconHiddenKeepAwakeOn), notifyIconBack]
     }
 }
